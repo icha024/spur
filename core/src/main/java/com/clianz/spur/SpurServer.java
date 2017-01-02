@@ -17,8 +17,6 @@ package com.clianz.spur;
 
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
@@ -42,7 +40,6 @@ public class SpurServer {
     private static final String SERVER_ALREADY_STARTED = "Server already started.";
     private static final SpurServer server = new SpurServer();
 
-    private static Executor executor = null;
     private static SortedSet<Endpoint> endpoints = new TreeSet<>();
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
@@ -61,12 +58,7 @@ public class SpurServer {
     }
 
     public static void start(SpurOptions options) {
-        executor = Executors.newWorkStealingPool();
         startServer(options);
-    }
-
-    public static void startSimpleBlockable() {
-        startServer(new SpurOptions());
     }
 
     private static void startServer(SpurOptions options) {
@@ -146,13 +138,12 @@ public class SpurServer {
             // non-blocking
             if (exchange.isInIoThread()) {
                 // LOGGER.info("Is in IO thread");
-                exchange.dispatch(executor, this);
+                exchange.dispatch(this);
                 return;
             }
             // handler code
             // LOGGER.info("STARTING Async");
             asyncBlockingHandler(exchange);
-            exchange.endExchange();
         }
 
         void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;

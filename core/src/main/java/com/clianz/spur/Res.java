@@ -44,6 +44,11 @@ public class Res {
     public void send(String body) {
         httpServerExchange.getResponseSender()
                 .send(body, StandardCharsets.UTF_8);
+        httpServerExchange.endExchange();
+    }
+
+    public void send() {
+        httpServerExchange.endExchange();
     }
 
     public void send(Object obj) {
@@ -56,5 +61,6 @@ public class Res {
     public void send(ByteBuffer byteBuffer) {
         httpServerExchange.getResponseSender()
                 .send(byteBuffer);
+        httpServerExchange.endExchange();
     }
 }
