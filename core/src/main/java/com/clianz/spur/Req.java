@@ -14,6 +14,7 @@ import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 
 import org.xnio.channels.StreamSourceChannel;
 
@@ -68,7 +69,15 @@ public class Req {
     public <T> void bodyAsValidatedObject(Consumer<T> jsonObjectConsumer, Class<T> t) {
         httpServerExchange.getRequestReceiver()
                 .receiveFullString((exchange, str) -> {
-                    T parsedType = gson.fromJson(str, t);
+                    T parsedType;
+                    try {
+                        parsedType = gson.fromJson(str, t);
+                    } catch (JsonParseException jpe) {
+                        exchange.setStatusCode(400);
+                        exchange.endExchange();
+                        return;
+                    }
+
                     Set<ConstraintViolation<T>> constraintViolations = validator.validate(parsedType);
                     if (constraintViolations.isEmpty()) {
                         jsonObjectConsumer.accept(parsedType);

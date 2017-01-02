@@ -89,10 +89,10 @@ public class SpurServer {
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
                 new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
-                        Predicates.parse("max-content-size[" + options.gzipMaxSize + "]"))).setNext(pathTemplateHandler);
+                        Predicates.maxContentSize(options.gzipMaxSize))).setNext(pathTemplateHandler);
 
         GracefulShutdownHandler gracefulShutdownHandler;
-        if (!options.gzipEnabled) {
+        if (options.gzipEnabled) {
             gracefulShutdownHandler = Handlers.gracefulShutdown(gzipEncodingHandler);
         } else {
             gracefulShutdownHandler = Handlers.gracefulShutdown(pathTemplateHandler);

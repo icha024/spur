@@ -12,7 +12,7 @@ public class SpurOptions {
     protected Boolean http2Enabled = true;
     protected int requestParseTimeOut = 2000;
     protected long maxEntitySize = 1024L * 1024L;
-    protected long gzipMaxSize = 8192L;
+    protected long gzipMaxSize = 860L;
 
     public static SpurOptions gzipEnabled(boolean gzipEnabled) {
         option.gzipEnabled = gzipEnabled;
