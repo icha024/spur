@@ -87,6 +87,7 @@ public class SpurServer {
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpoints.forEach(endpoint -> pathTemplateHandler.add(endpoint.getPath(), (AsyncHttpHandler) exchange -> {
+            // FIXME: over-wrote multi method on same path.
             if (endpoint.getMethod()
                     .equals(exchange.getRequestMethod())) {
                 endpoint.getReqResBiConsumer()
