@@ -15,7 +15,9 @@
  */
 package com.clianz.spur;
 
-import java.util.SortedSet;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
@@ -40,7 +42,8 @@ public class SpurServer {
     private static final String SERVER_ALREADY_STARTED = "Server already started.";
     private static final SpurServer server = new SpurServer();
 
-    private static SortedSet<Endpoint> endpoints = new TreeSet<>();
+    //    private static SortedSet<Endpoint> endpointsMap = new TreeSet<>();
+    private static SortedMap<String, Set<Endpoint>> endpointsMap = new TreeMap<>();
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
 
@@ -78,14 +81,12 @@ public class SpurServer {
 
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
-        endpoints.forEach(endpoint -> pathTemplateHandler.add(endpoint.getPath(), (AsyncHttpHandler) exchange -> {
-            // FIXME: over-wrote multi method on same path.
-            if (endpoint.getMethod()
-                    .equals(exchange.getRequestMethod())) {
-                endpoint.getReqResBiConsumer()
-                        .accept(new Req(exchange), new Res(exchange));
-            }
-        }));
+        endpointsMap.forEach((path, endpoints) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> endpoints.stream()
+                .filter(endpoint -> endpoint.getMethod()
+                        .equals(exchange.getRequestMethod()))
+                .findFirst()
+                .ifPresent(endpoint -> endpoint.getReqResBiConsumer()
+                        .accept(new Req(exchange), new Res(exchange)))));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
                 new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
@@ -128,7 +129,9 @@ public class SpurServer {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
-        endpoints.add(new Endpoint(new HttpString(method), path, reqRes));
+        endpointsMap.putIfAbsent(path, new TreeSet<>());
+        endpointsMap.get(path)
+                .add(new Endpoint(new HttpString(method), path, reqRes));
         return server;
     }
 
