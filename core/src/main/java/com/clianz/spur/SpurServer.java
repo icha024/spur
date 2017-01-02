@@ -15,10 +15,8 @@
  */
 package com.clianz.spur;
 
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
@@ -42,8 +40,7 @@ public class SpurServer {
     private static final String SERVER_ALREADY_STARTED = "Server already started.";
     private static final SpurServer server = new SpurServer();
 
-    //    private static SortedSet<Endpoint> endpointsMap = new TreeSet<>();
-    private static SortedMap<String, Set<Endpoint>> endpointsMap = new TreeMap<>();
+    private static Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
 
@@ -71,22 +68,22 @@ public class SpurServer {
 
         LOGGER.info("Listening to " + options.host + ":" + options.port);
         Undertow server = builder.addHttpListener(options.port, options.host)
-                .setHandler(getHandlers(options))
                 .setServerOption(UndertowOptions.REQUEST_PARSE_TIMEOUT, options.requestParseTimeOut)
                 .setServerOption(UndertowOptions.ENABLE_HTTP2, options.http2Enabled)
                 .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, options.maxEntitySize)
+                .setHandler(getHandlers(options))
                 .build();
         server.start();
     }
 
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
-        endpointsMap.forEach((path, endpoints) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> endpoints.stream()
-                .filter(endpoint -> endpoint.getMethod()
-                        .equals(exchange.getRequestMethod()))
-                .findFirst()
-                .ifPresent(endpoint -> endpoint.getReqResBiConsumer()
-                        .accept(new Req(exchange), new Res(exchange)))));
+        endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
+            Endpoint endpoint = methodEndpointMap.get(exchange.getRequestMethod());
+            if (endpoint != null) {
+                endpoint.getReqResBiConsumer().accept(new Req(exchange), new Res(exchange));
+            }
+        }));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
                 new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
@@ -129,9 +126,8 @@ public class SpurServer {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
-        endpointsMap.putIfAbsent(path, new TreeSet<>());
-        endpointsMap.get(path)
-                .add(new Endpoint(new HttpString(method), path, reqRes));
+        endpointsMap.putIfAbsent(path, new HashMap<>());
+        endpointsMap.get(path).put(new HttpString(method), new Endpoint(new HttpString(method), path, reqRes));
         return server;
     }
 
