@@ -1,9 +1,8 @@
 package com.clianz.spur;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class SpurOptions {
 
@@ -18,14 +17,21 @@ public class SpurOptions {
     protected int requestParseTimeOut = 2000;
     protected long maxEntitySize = 1024L * 1024L;
     protected long gzipMaxSize = 860L;
-    protected List<String> corsHeaders = Arrays.asList(getEnvProperty("CORS", "").split(","));
+    protected List<String> corsHeaders = parseCorsString(getEnvProperty("CORS", ""));
 
     public static SpurOptions enableCorsHeaders(String corsHeaders) {
-        option.corsHeaders = Arrays.asList(getEnvProperty("CORS", "").split(","));
+        option.corsHeaders = parseCorsString(corsHeaders);
         return option;
     }
 
-    public static SpurOptions gzipEnabled(boolean gzipEnabled) {
+    private static List<String> parseCorsString(String corsString) {
+        return Arrays.asList(corsString.split(","))
+                .stream()
+                .map(s -> s.trim())
+                .collect(Collectors.toList());
+    }
+
+    public static SpurOptions enableGzip(boolean gzipEnabled) {
         option.gzipEnabled = gzipEnabled;
         return option;
     }
@@ -40,7 +46,7 @@ public class SpurOptions {
         return option;
     }
 
-    public static SpurOptions http2Enabled(Boolean http2Enabled) {
+    public static SpurOptions enableHttp2(Boolean http2Enabled) {
         option.http2Enabled = http2Enabled;
         return option;
     }

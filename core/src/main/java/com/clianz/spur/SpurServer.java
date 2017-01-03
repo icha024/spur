@@ -66,7 +66,9 @@ public class SpurServer {
             res.send(req.body());
         });
         delete("/a", (req, res) -> res.send("something gone"));
-        start(SpurOptions.gzipEnabled(true));
+
+        start(SpurOptions.enableGzip(true)
+                .enableCorsHeaders("a"));
     }
 
     public static void start() {
@@ -97,13 +99,14 @@ public class SpurServer {
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
             HttpString requestMethod = exchange.getRequestMethod();
 
-            String requestAccessControlRequestMethods = getHeaderVal(exchange, new HttpString("Access-Control-Request-Method"));
-            String requestOrigin = getHeaderVal(exchange, Headers.ORIGIN);
+            String requestAccessControlRequestMethods = getRequestHeader(exchange, new HttpString("Access-Control-Request-Method"));
+            String requestOrigin = getRequestHeader(exchange, Headers.ORIGIN);
             if (requestMethod.equals(HEAD)) {
                 requestMethod = GET;
             } else if (requestMethod.equals(OPTIONS) && methodEndpointMap.containsKey(requestAccessControlRequestMethods)
                     && isValidCORSOrigin(options, requestOrigin)) {
-                setCorsHeaders(options, methodEndpointMap, exchange, requestOrigin);
+                setCorsOriginHeader(exchange, requestOrigin);
+                setCorsMethodHeader(options, methodEndpointMap, exchange);
                 exchange.endExchange();
                 return;
             }
@@ -116,9 +119,10 @@ public class SpurServer {
                 exchange.endExchange();
                 return;
             }
+
             LOGGER.info("Found method: " + endpoint.getMethod());
             if (isValidCORSOrigin(options, requestOrigin)) {
-                setCorsHeaders(options, methodEndpointMap, exchange, requestOrigin);
+                setCorsOriginHeader(exchange, requestOrigin);
             }
             Req req = new Req(exchange, endpoint.getBodyClassType());
             Res res = new Res(exchange);
@@ -131,20 +135,16 @@ public class SpurServer {
                         Predicates.maxContentSize(options.gzipMaxSize))).setNext(pathTemplateHandler);
 
         GracefulShutdownHandler gracefulShutdownHandler;
-        if (options.gzipEnabled)
-
-        {
+        if (options.gzipEnabled) {
             gracefulShutdownHandler = Handlers.gracefulShutdown(gzipEncodingHandler);
-        } else
-
-        {
+        } else {
             gracefulShutdownHandler = Handlers.gracefulShutdown(pathTemplateHandler);
         }
 
         return gracefulShutdownHandler;
     }
 
-    private static String getHeaderVal(HttpServerExchange exchange, HttpString headerName) {
+    private static String getRequestHeader(HttpServerExchange exchange, HttpString headerName) {
         if (exchange.getRequestHeaders()
                 .contains(headerName)) {
             return exchange.getRequestHeaders()
@@ -155,31 +155,17 @@ public class SpurServer {
     }
 
     private static boolean isValidCORSOrigin(SpurOptions options, String requestOrigin) {
-        //        if (options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin)) {
-        //            return true;
-        //        }
-        //
-        //        if (options.corsHeaders.contains(requestOrigin)) {
-        //            return true;
-        //        }
-        //
-        //
-        //        if (options.corsHeaders.size() == 0) {
-        //            return false;
-        //        }
-        //
-        //        if (requestOrigin == null && !options.corsHeaders.contains("*")) {
-        //            return false;
-        //        }
         return options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin);
     }
 
-    private static void setCorsHeaders(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange,
-            String requestOrigin) {
-        exchange.getResponseHeaders()
-                .put(new HttpString("Access-Control-Allow-Methods"), getAllowedMethods(methodEndpointMap, options));
+    private static void setCorsOriginHeader(HttpServerExchange exchange, String requestOrigin) {
         exchange.getResponseHeaders()
                 .put(new HttpString("Access-Control-Allow-Origin"), requestOrigin);
+    }
+
+    private static void setCorsMethodHeader(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange) {
+        exchange.getResponseHeaders()
+                .put(new HttpString("Access-Control-Allow-Methods"), getAllowedMethods(methodEndpointMap, options));
     }
 
     private static String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap, SpurOptions options) {
