@@ -15,8 +15,16 @@
  */
 package com.clianz.spur;
 
+import static com.clianz.spur.HttpMethods.DELETE;
+import static com.clianz.spur.HttpMethods.GET;
+import static com.clianz.spur.HttpMethods.HEAD;
+import static com.clianz.spur.HttpMethods.POST;
+import static com.clianz.spur.HttpMethods.PUT;
+
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
@@ -84,12 +92,17 @@ public class SpurServer {
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
-            Endpoint endpoint = methodEndpointMap.get(exchange.getRequestMethod());
+            HttpString requestMethod = exchange.getRequestMethod();
+            if (requestMethod.equals(HEAD)) {
+                requestMethod = GET;
+            }
+
+            Endpoint endpoint = methodEndpointMap.get(requestMethod);
+
             if (endpoint == null) {
                 exchange.setStatusCode(405);
-                StringBuilder methodsAllows = new StringBuilder();
-                methodEndpointMap.keySet().forEach(httpString -> methodsAllows.append(", " + httpString));
-                exchange.getResponseHeaders().put(Headers.ALLOW, methodsAllows.toString().substring(2));
+                exchange.getResponseHeaders()
+                        .put(Headers.ALLOW, getAllowedMethods(methodEndpointMap));
                 exchange.endExchange();
                 return;
             }
@@ -115,6 +128,17 @@ public class SpurServer {
         return gracefulShutdownHandler;
     }
 
+    private static String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap) {
+        StringBuilder methodsAllowed = new StringBuilder();
+        Set<HttpString> methodsDefined = new TreeSet<>(methodEndpointMap.keySet());
+        if (methodsDefined.contains(GET)) {
+            methodsDefined.add(HEAD);
+        }
+        methodsDefined.forEach(httpString -> methodsAllowed.append(", " + httpString));
+        return methodsAllowed.toString()
+                .substring(2);
+    }
+
     public static Undertow.Builder getRawUndertowBuilder() {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
@@ -123,28 +147,28 @@ public class SpurServer {
     }
 
     public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
-        return setPathHandler("GET", path, reqRes, null);
+        return setPathHandler(GET, path, reqRes, null);
     }
 
     public static <T> SpurServer put(String path, BiConsumer<Req<T>, Res> reqRes, Class<T> bodyClass) {
-        return setPathHandler("PUT", path, reqRes, bodyClass);
+        return setPathHandler(PUT, path, reqRes, bodyClass);
     }
 
     public static <T> SpurServer post(String path, BiConsumer<Req<T>, Res> reqRes, Class<T> bodyClass) {
-        return setPathHandler("POST", path, reqRes, bodyClass);
+        return setPathHandler(POST, path, reqRes, bodyClass);
     }
 
     public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
-        return setPathHandler("DELETE", path, reqRes, null);
+        return setPathHandler(DELETE, path, reqRes, null);
     }
 
-    private static <T> SpurServer setPathHandler(String method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
+    private static <T> SpurServer setPathHandler(HttpString method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
         endpointsMap.putIfAbsent(path, new HashMap<>());
         endpointsMap.get(path)
-                .put(new HttpString(method), new Endpoint(new HttpString(method), path, reqRes, classType));
+                .put(method, new Endpoint(method, path, reqRes, classType));
         return server;
     }
 

@@ -1,5 +1,7 @@
 package com.clianz.spur;
 
+import static com.clianz.spur.HttpMethods.HEAD;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -42,6 +44,10 @@ public class Res {
     }
 
     public void send(String body) {
+        if (httpServerExchange.getRequestMethod().equals(HEAD)) {
+            httpServerExchange.endExchange();
+            return;
+        }
         httpServerExchange.getResponseSender()
                 .send(body, StandardCharsets.UTF_8);
         httpServerExchange.endExchange();
@@ -51,16 +57,24 @@ public class Res {
         httpServerExchange.endExchange();
     }
 
+    public void send(ByteBuffer byteBuffer) {
+        if (httpServerExchange.getRequestMethod().equals(HEAD)) {
+            httpServerExchange.endExchange();
+            return;
+        }
+        httpServerExchange.getResponseSender()
+                .send(byteBuffer);
+        httpServerExchange.endExchange();
+    }
+
     public void send(Object obj) {
+        if (httpServerExchange.getRequestMethod().equals(HEAD)) {
+            httpServerExchange.endExchange();
+            return;
+        }
         httpServerExchange.getResponseHeaders()
                 .put(Headers.CONTENT_TYPE, JSON_CONTENT_TYPE);
         httpServerExchange.getResponseSender()
                 .send(gson.toJson(obj));
-    }
-
-    public void send(ByteBuffer byteBuffer) {
-        httpServerExchange.getResponseSender()
-                .send(byteBuffer);
-        httpServerExchange.endExchange();
     }
 }
