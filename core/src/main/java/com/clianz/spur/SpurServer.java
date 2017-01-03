@@ -50,7 +50,9 @@ public class SpurServer {
             // res.send("Hello Again!");
             res.send(new SpurOptions());
         });
-        post("/a", (req, res) -> res.send(new SpurOptions()), SpurOptions.class);
+        post("/a", (req, res) -> {
+            res.send(req.body().toUpperCase());
+        }, String.class);
         start(SpurOptions.gzipEnabled(true));
     }
 
@@ -111,23 +113,23 @@ public class SpurServer {
         return builder;
     }
 
-    public static SpurServer get(String path, BiConsumer<Req, Res> reqRes) {
+    public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler("GET", path, reqRes, null);
     }
 
-    public static <T> SpurServer put(String path, BiConsumer<Req, Res> reqRes, Class<T> bodyClass) {
+    public static <T> SpurServer put(String path, BiConsumer<Req<T>, Res> reqRes, Class<T> bodyClass) {
         return setPathHandler("PUT", path, reqRes, bodyClass);
     }
 
-    public static <T> SpurServer post(String path, BiConsumer<Req, Res> reqRes, Class<T> bodyClass) {
+    public static <T> SpurServer post(String path, BiConsumer<Req<T>, Res> reqRes, Class<T> bodyClass) {
         return setPathHandler("POST", path, reqRes, bodyClass);
     }
 
-    public static SpurServer delete(String path, BiConsumer<Req, Res> reqRes) {
+    public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler("DELETE", path, reqRes, null);
     }
 
-    private static <T> SpurServer setPathHandler(String method, String path, BiConsumer<Req, Res> reqRes, Class<T> classType) {
+    private static <T> SpurServer setPathHandler(String method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }

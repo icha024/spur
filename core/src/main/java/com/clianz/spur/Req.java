@@ -16,8 +16,6 @@ import javax.validation.ValidatorFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 
-import org.xnio.channels.StreamSourceChannel;
-
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
 
@@ -56,20 +54,6 @@ public class Req<T> {
         return httpServerExchange.getRequestHeaders();
     }
 
-//    public StreamSourceChannel bodyAsStream() {
-//        return httpServerExchange.getRequestChannel();
-//    }
-//
-//    public void bodyAsBytes(Consumer<byte[]> byteConsumer) {
-//        httpServerExchange.getRequestReceiver()
-//                .receiveFullBytes((exchange, bytes) -> byteConsumer.accept(bytes));
-//    }
-
-//    public void body(Consumer<String> stringConsumer) {
-//        httpServerExchange.getRequestReceiver()
-//                .receiveFullString((httpServerExchange1, s) -> stringConsumer.accept(s), StandardCharsets.UTF_8);
-//    }
-
     public T body() {
         return body;
     }
@@ -77,14 +61,16 @@ public class Req<T> {
     protected void parseBody(Consumer objectConsumer) {
         httpServerExchange.getRequestReceiver()
                 .receiveFullString((exchange, str) -> {
-                    if (bodyClassType == null || bodyClassType.equals(Void.class)) {
-                        objectConsumer.accept(null);
-                        return;
-                    } else if (bodyClassType.equals(String.class)) {
+                    if (bodyClassType == null || bodyClassType.equals(Void.class) || bodyClassType.equals(String.class)) {
                         this.body = (T) str;
                         objectConsumer.accept(str);
                         return;
                     }
+//                    else if (bodyClassType.equals(String.class)) {
+//                        this.body = (T) str;
+//                        objectConsumer.accept(str);
+//                        return;
+//                    }
 
                     T parsedType;
                     try {
@@ -116,10 +102,6 @@ public class Req<T> {
                     }
                 }, StandardCharsets.UTF_8);
     }
-//
-//    public long bodyLength() {
-//        return httpServerExchange.getRequestContentLength();
-//    }
 
     private class InvalidValues {
         private List<String> invalidValues;
