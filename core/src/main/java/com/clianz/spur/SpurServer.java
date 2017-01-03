@@ -51,7 +51,8 @@ public class SpurServer {
             res.send(new SpurOptions());
         });
         post("/a", (req, res) -> {
-            res.send(req.body().toUpperCase());
+            res.send(req.body()
+                    .toUpperCase());
         }, String.class);
         start(SpurOptions.gzipEnabled(true));
     }
@@ -84,12 +85,16 @@ public class SpurServer {
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
             Endpoint endpoint = methodEndpointMap.get(exchange.getRequestMethod());
             LOGGER.info("Found method: " + endpoint.getMethod());
-            if (endpoint != null) {
-                Req req = new Req(exchange, endpoint.getBodyClassType());
-                Res res = new Res(exchange);
-                req.parseBody(body -> endpoint.getReqResBiConsumer()
-                        .accept(req, res));
+            if (endpoint == null) {
+                exchange.setStatusCode(404);
+                exchange.endExchange();
+                return;
             }
+            Req req = new Req(exchange, endpoint.getBodyClassType());
+            Res res = new Res(exchange);
+            req.parseBody(body -> endpoint.getReqResBiConsumer()
+                    .accept(req, res));
+
         }));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(

@@ -61,46 +61,45 @@ public class Req<T> {
     protected void parseBody(Consumer objectConsumer) {
         httpServerExchange.getRequestReceiver()
                 .receiveFullString((exchange, str) -> {
-                    if (bodyClassType == null || bodyClassType.equals(Void.class) || bodyClassType.equals(String.class)) {
-                        this.body = (T) str;
-                        objectConsumer.accept(str);
-                        return;
-                    }
-//                    else if (bodyClassType.equals(String.class)) {
-//                        this.body = (T) str;
-//                        objectConsumer.accept(str);
-//                        return;
-//                    }
-
-                    T parsedType;
-                    try {
-                        parsedType = gson.fromJson(str, bodyClassType);
-                    } catch (JsonParseException jpe) {
-                        exchange.setStatusCode(400);
-                        exchange.endExchange();
-                        return;
-                    }
-
-                    if (parsedType == null) {
-                        exchange.setStatusCode(400);
-                        exchange.endExchange();
-                        return;
-                    }
-
-                    Set<ConstraintViolation<T>> constraintViolations = validator.validate(parsedType);
-                    if (constraintViolations.isEmpty()) {
-                        this.body = parsedType;
-                        objectConsumer.accept(parsedType);
-                    } else {
-                        exchange.setStatusCode(400);
-                        exchange.getResponseSender()
-                                .send(gson.toJson(new InvalidValues(constraintViolations.stream()
-                                        .map(violation -> violation.getPropertyPath()
-                                                .toString())
-                                        .collect(Collectors.toList()))));
-                        exchange.endExchange();
-                    }
+                    convertBodyStringToObj(objectConsumer, exchange, str);
                 }, StandardCharsets.UTF_8);
+    }
+
+    private void convertBodyStringToObj(Consumer objectConsumer, HttpServerExchange exchange, String str) {
+        if (bodyClassType == null || bodyClassType.equals(Void.class) || bodyClassType.equals(String.class)) {
+            this.body = (T) str;
+            objectConsumer.accept(str);
+            return;
+        }
+
+        T parsedType;
+        try {
+            parsedType = gson.fromJson(str, bodyClassType);
+        } catch (JsonParseException jpe) {
+            exchange.setStatusCode(400);
+            exchange.endExchange();
+            return;
+        }
+
+        if (parsedType == null) {
+            exchange.setStatusCode(400);
+            exchange.endExchange();
+            return;
+        }
+
+        Set<ConstraintViolation<T>> constraintViolations = validator.validate(parsedType);
+        if (constraintViolations.isEmpty()) {
+            this.body = parsedType;
+            objectConsumer.accept(parsedType);
+        } else {
+            exchange.setStatusCode(400);
+            exchange.getResponseSender()
+                    .send(gson.toJson(new InvalidValues(constraintViolations.stream()
+                            .map(violation -> violation.getPropertyPath()
+                                    .toString())
+                            .collect(Collectors.toList()))));
+            exchange.endExchange();
+        }
     }
 
     private class InvalidValues {
