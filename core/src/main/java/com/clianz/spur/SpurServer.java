@@ -18,6 +18,7 @@ package com.clianz.spur;
 import static com.clianz.spur.internal.HttpMethods.DELETE;
 import static com.clianz.spur.internal.HttpMethods.GET;
 import static com.clianz.spur.internal.HttpMethods.HEAD;
+import static com.clianz.spur.internal.HttpMethods.OPTIONS;
 import static com.clianz.spur.internal.HttpMethods.POST;
 import static com.clianz.spur.internal.HttpMethods.PUT;
 
@@ -61,9 +62,9 @@ public class SpurServer {
             // res.send("Hello Again!");
             res.send(new SpurOptions());
         });
-        post("/a", (req, res) -> {
+        post("/a", String.class, (req, res) -> {
             res.send(req.body());
-        }, null);
+        });
         delete("/a", (req, res) -> res.send("something gone"));
         start(SpurOptions.gzipEnabled(true));
     }
@@ -95,25 +96,34 @@ public class SpurServer {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
             HttpString requestMethod = exchange.getRequestMethod();
+
+            String requestAccessControlRequestMethods = getHeaderVal(exchange, new HttpString("Access-Control-Request-Method"));
+            String requestOrigin = getHeaderVal(exchange, Headers.ORIGIN);
             if (requestMethod.equals(HEAD)) {
                 requestMethod = GET;
+            } else if (requestMethod.equals(OPTIONS) && methodEndpointMap.containsKey(requestAccessControlRequestMethods)
+                    && isValidCORSOrigin(options, requestOrigin)) {
+                setCorsHeaders(options, methodEndpointMap, exchange, requestOrigin);
+                exchange.endExchange();
+                return;
             }
 
             Endpoint endpoint = methodEndpointMap.get(requestMethod);
-
             if (endpoint == null) {
                 exchange.setStatusCode(405);
                 exchange.getResponseHeaders()
-                        .put(Headers.ALLOW, getAllowedMethods(methodEndpointMap));
+                        .put(Headers.ALLOW, getAllowedMethods(methodEndpointMap, options));
                 exchange.endExchange();
                 return;
             }
             LOGGER.info("Found method: " + endpoint.getMethod());
+            if (isValidCORSOrigin(options, requestOrigin)) {
+                setCorsHeaders(options, methodEndpointMap, exchange, requestOrigin);
+            }
             Req req = new Req(exchange, endpoint.getBodyClassType());
             Res res = new Res(exchange);
             req.parseBody(body -> endpoint.getReqResBiConsumer()
                     .accept(req, res));
-
         }));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
@@ -121,27 +131,73 @@ public class SpurServer {
                         Predicates.maxContentSize(options.gzipMaxSize))).setNext(pathTemplateHandler);
 
         GracefulShutdownHandler gracefulShutdownHandler;
-        if (options.gzipEnabled) {
+        if (options.gzipEnabled)
+
+        {
             gracefulShutdownHandler = Handlers.gracefulShutdown(gzipEncodingHandler);
-        } else {
+        } else
+
+        {
             gracefulShutdownHandler = Handlers.gracefulShutdown(pathTemplateHandler);
         }
 
         return gracefulShutdownHandler;
     }
 
-    private static String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap) {
+    private static String getHeaderVal(HttpServerExchange exchange, HttpString headerName) {
+        if (exchange.getRequestHeaders()
+                .contains(headerName)) {
+            return exchange.getRequestHeaders()
+                    .get(headerName)
+                    .getFirst();
+        }
+        return null;
+    }
+
+    private static boolean isValidCORSOrigin(SpurOptions options, String requestOrigin) {
+        //        if (options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin)) {
+        //            return true;
+        //        }
+        //
+        //        if (options.corsHeaders.contains(requestOrigin)) {
+        //            return true;
+        //        }
+        //
+        //
+        //        if (options.corsHeaders.size() == 0) {
+        //            return false;
+        //        }
+        //
+        //        if (requestOrigin == null && !options.corsHeaders.contains("*")) {
+        //            return false;
+        //        }
+        return options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin);
+    }
+
+    private static void setCorsHeaders(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange,
+            String requestOrigin) {
+        exchange.getResponseHeaders()
+                .put(new HttpString("Access-Control-Allow-Methods"), getAllowedMethods(methodEndpointMap, options));
+        exchange.getResponseHeaders()
+                .put(new HttpString("Access-Control-Allow-Origin"), requestOrigin);
+    }
+
+    private static String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap, SpurOptions options) {
         StringBuilder methodsAllowed = new StringBuilder();
         Set<HttpString> methodsDefined = new TreeSet<>(methodEndpointMap.keySet());
         if (methodsDefined.contains(GET)) {
             methodsDefined.add(HEAD);
         }
+        if (options.corsHeaders.size() > 0) {
+            methodsDefined.add(OPTIONS);
+        }
+
         methodsDefined.forEach(httpString -> methodsAllowed.append(", " + httpString));
         return methodsAllowed.toString()
                 .substring(2);
     }
 
-    public static Undertow.Builder getRawUndertowBuilder() {
+    public static Undertow.Builder rawUndertowBuilder() {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
@@ -152,11 +208,11 @@ public class SpurServer {
         return setPathHandler(GET, path, reqRes, null);
     }
 
-    public static <T> SpurServer put(String path, BiConsumer<Req<T>, Res> reqRes, Class<T> bodyClass) {
+    public static <T> SpurServer put(String path, Class<T> bodyClass, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(PUT, path, reqRes, bodyClass);
     }
 
-    public static <T> SpurServer post(String path, BiConsumer<Req<T>, Res> reqRes, Class<T> bodyClass) {
+    public static <T> SpurServer post(String path, Class<T> bodyClass, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(POST, path, reqRes, bodyClass);
     }
 

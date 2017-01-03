@@ -1,5 +1,10 @@
 package com.clianz.spur;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+
 public class SpurOptions {
 
     private static final String DEFAULT_HOST = "0.0.0.0";
@@ -13,6 +18,12 @@ public class SpurOptions {
     protected int requestParseTimeOut = 2000;
     protected long maxEntitySize = 1024L * 1024L;
     protected long gzipMaxSize = 860L;
+    protected List<String> corsHeaders = Arrays.asList(getEnvProperty("CORS", "").split(","));
+
+    public static SpurOptions enableCorsHeaders(String corsHeaders) {
+        option.corsHeaders = Arrays.asList(getEnvProperty("CORS", "").split(","));
+        return option;
+    }
 
     public static SpurOptions gzipEnabled(boolean gzipEnabled) {
         option.gzipEnabled = gzipEnabled;

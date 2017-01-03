@@ -42,7 +42,7 @@ public class Req<T> {
         this.bodyClassType = bodyClassType;
     }
 
-    public HttpServerExchange getRawHttpServerExchange() {
+    public HttpServerExchange rawHttpServerExchange() {
         return httpServerExchange;
     }
 
