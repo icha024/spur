@@ -32,6 +32,7 @@ import io.undertow.server.handlers.PathTemplateHandler;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
+import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 
 public class SpurServer {
@@ -51,9 +52,9 @@ public class SpurServer {
             res.send(new SpurOptions());
         });
         post("/a", (req, res) -> {
-            res.send(req.body()
-                    .toUpperCase());
-        }, String.class);
+            res.send(req.body());
+        }, null);
+        delete("/a", (req, res) -> res.send("something gone"));
         start(SpurOptions.gzipEnabled(true));
     }
 
@@ -84,12 +85,15 @@ public class SpurServer {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
             Endpoint endpoint = methodEndpointMap.get(exchange.getRequestMethod());
-            LOGGER.info("Found method: " + endpoint.getMethod());
             if (endpoint == null) {
-                exchange.setStatusCode(404);
+                exchange.setStatusCode(405);
+                StringBuilder methodsAllows = new StringBuilder();
+                methodEndpointMap.keySet().forEach(httpString -> methodsAllows.append(", " + httpString));
+                exchange.getResponseHeaders().put(Headers.ALLOW, methodsAllows.toString().substring(2));
                 exchange.endExchange();
                 return;
             }
+            LOGGER.info("Found method: " + endpoint.getMethod());
             Req req = new Req(exchange, endpoint.getBodyClassType());
             Res res = new Res(exchange);
             req.parseBody(body -> endpoint.getReqResBiConsumer()

@@ -5,7 +5,7 @@ import java.util.function.BiConsumer;
 
 import io.undertow.util.HttpString;
 
-public class Endpoint<T> implements Comparable<Endpoint> {
+public class Endpoint<T> {
 
     private String path;
     private HttpString method;
@@ -48,14 +48,5 @@ public class Endpoint<T> implements Comparable<Endpoint> {
     @Override
     public int hashCode() {
         return Objects.hash(path, method);
-    }
-
-    @Override
-    public int compareTo(Endpoint o) {
-        int comparePath = this.path.compareToIgnoreCase(o.path);
-        if (comparePath == 0) {
-            return this.method.compareTo(o.method);
-        }
-        return comparePath;
     }
 }
