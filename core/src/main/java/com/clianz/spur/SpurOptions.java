@@ -25,9 +25,8 @@ public class SpurOptions {
     }
 
     private static List<String> parseCorsString(String corsString) {
-        return Arrays.asList(corsString.split(","))
-                .stream()
-                .map(s -> s.trim())
+        return Arrays.stream(corsString.split(","))
+                .map(String::trim)
                 .collect(Collectors.toList());
     }
 

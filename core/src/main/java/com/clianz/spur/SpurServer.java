@@ -51,6 +51,9 @@ public class SpurServer {
     private static final Logger LOGGER = Logger.getLogger(SpurServer.class.getName());
     private static final String SERVER_ALREADY_STARTED = "Server already started.";
     private static final SpurServer server = new SpurServer();
+    private static final HttpString ACCESS_CONTROL_REQUEST_METHOD = new HttpString("Access-Control-Request-Method");
+    private static final HttpString ACCESS_CONTROL_ALLOW_ORIGIN = new HttpString("Access-Control-Allow-Origin");
+    private static final HttpString ACCESS_CONTROL_ALLOW_METHOD = new HttpString("Access-Control-Allow-Methods");
 
     private static Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
@@ -97,37 +100,7 @@ public class SpurServer {
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
-            HttpString requestMethod = exchange.getRequestMethod();
-
-            String requestAccessControlRequestMethods = getRequestHeader(exchange, new HttpString("Access-Control-Request-Method"));
-            String requestOrigin = getRequestHeader(exchange, Headers.ORIGIN);
-            if (requestMethod.equals(HEAD)) {
-                requestMethod = GET;
-            } else if (requestMethod.equals(OPTIONS) && methodEndpointMap.containsKey(requestAccessControlRequestMethods)
-                    && isValidCORSOrigin(options, requestOrigin)) {
-                setCorsOriginHeader(exchange, requestOrigin);
-                setCorsMethodHeader(options, methodEndpointMap, exchange);
-                exchange.endExchange();
-                return;
-            }
-
-            Endpoint endpoint = methodEndpointMap.get(requestMethod);
-            if (endpoint == null) {
-                exchange.setStatusCode(405);
-                exchange.getResponseHeaders()
-                        .put(Headers.ALLOW, getAllowedMethods(methodEndpointMap, options));
-                exchange.endExchange();
-                return;
-            }
-
-            LOGGER.info("Found method: " + endpoint.getMethod());
-            if (isValidCORSOrigin(options, requestOrigin)) {
-                setCorsOriginHeader(exchange, requestOrigin);
-            }
-            Req req = new Req(exchange, endpoint.getBodyClassType());
-            Res res = new Res(exchange);
-            req.parseBody(body -> endpoint.getReqResBiConsumer()
-                    .accept(req, res));
+            createPathTemplateHandler(options, methodEndpointMap, exchange);
         }));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
@@ -142,6 +115,41 @@ public class SpurServer {
         }
 
         return gracefulShutdownHandler;
+    }
+
+    private static void createPathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
+            HttpServerExchange exchange) {
+        HttpString requestMethod = exchange.getRequestMethod();
+
+        String requestAccessControlRequestMethod = getRequestHeader(exchange, ACCESS_CONTROL_REQUEST_METHOD);
+        String requestOrigin = getRequestHeader(exchange, Headers.ORIGIN);
+        if (requestMethod.equals(HEAD)) {
+            requestMethod = GET;
+        } else if (requestMethod.equals(OPTIONS) && requestAccessControlRequestMethod != null && methodEndpointsMap.containsKey(
+                new HttpString(requestAccessControlRequestMethod)) && isValidCORSOrigin(options, requestOrigin)) {
+            setCorsOriginHeader(exchange, requestOrigin);
+            setCorsMethodHeader(options, methodEndpointsMap, exchange);
+            exchange.endExchange();
+            return;
+        }
+
+        Endpoint endpoint = methodEndpointsMap.get(requestMethod);
+        if (endpoint == null) {
+            exchange.setStatusCode(405);
+            exchange.getResponseHeaders()
+                    .put(Headers.ALLOW, getAllowedMethods(methodEndpointsMap, options));
+            exchange.endExchange();
+            return;
+        }
+
+        LOGGER.info("Found method: " + endpoint.getMethod());
+        if (isValidCORSOrigin(options, requestOrigin)) {
+            setCorsOriginHeader(exchange, requestOrigin);
+        }
+        Req req = new Req(exchange, endpoint.getBodyClassType());
+        Res res = new Res(exchange);
+        req.parseBody(body -> endpoint.getReqResBiConsumer()
+                .accept(req, res));
     }
 
     private static String getRequestHeader(HttpServerExchange exchange, HttpString headerName) {
@@ -160,12 +168,12 @@ public class SpurServer {
 
     private static void setCorsOriginHeader(HttpServerExchange exchange, String requestOrigin) {
         exchange.getResponseHeaders()
-                .put(new HttpString("Access-Control-Allow-Origin"), requestOrigin);
+                .put(ACCESS_CONTROL_ALLOW_ORIGIN, requestOrigin);
     }
 
     private static void setCorsMethodHeader(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange) {
         exchange.getResponseHeaders()
-                .put(new HttpString("Access-Control-Allow-Methods"), getAllowedMethods(methodEndpointMap, options));
+                .put(ACCESS_CONTROL_ALLOW_METHOD, getAllowedMethods(methodEndpointMap, options));
     }
 
     private static String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap, SpurOptions options) {
