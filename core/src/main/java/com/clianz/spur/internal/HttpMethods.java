@@ -1,4 +1,4 @@
-package com.clianz.spur;
+package com.clianz.spur.internal;
 
 import io.undertow.util.HttpString;
 

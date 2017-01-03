@@ -15,11 +15,11 @@
  */
 package com.clianz.spur;
 
-import static com.clianz.spur.HttpMethods.DELETE;
-import static com.clianz.spur.HttpMethods.GET;
-import static com.clianz.spur.HttpMethods.HEAD;
-import static com.clianz.spur.HttpMethods.POST;
-import static com.clianz.spur.HttpMethods.PUT;
+import static com.clianz.spur.internal.HttpMethods.DELETE;
+import static com.clianz.spur.internal.HttpMethods.GET;
+import static com.clianz.spur.internal.HttpMethods.HEAD;
+import static com.clianz.spur.internal.HttpMethods.POST;
+import static com.clianz.spur.internal.HttpMethods.PUT;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +28,8 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
+
+import com.clianz.spur.internal.Endpoint;
 
 import io.undertow.Handlers;
 import io.undertow.Undertow;

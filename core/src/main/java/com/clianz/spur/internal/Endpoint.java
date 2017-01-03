@@ -1,7 +1,10 @@
-package com.clianz.spur;
+package com.clianz.spur.internal;
 
 import java.util.Objects;
 import java.util.function.BiConsumer;
+
+import com.clianz.spur.Req;
+import com.clianz.spur.Res;
 
 import io.undertow.util.HttpString;
 

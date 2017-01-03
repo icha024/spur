@@ -1,6 +1,6 @@
 package com.clianz.spur;
 
-import static com.clianz.spur.HttpMethods.HEAD;
+import static com.clianz.spur.internal.HttpMethods.HEAD;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
