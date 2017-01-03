@@ -5,16 +5,18 @@ import java.util.function.BiConsumer;
 
 import io.undertow.util.HttpString;
 
-public class Endpoint implements Comparable<Endpoint> {
+public class Endpoint<T> implements Comparable<Endpoint> {
 
     private String path;
     private HttpString method;
     private BiConsumer<Req, Res> reqResBiConsumer;
+    private Class<T> bodyClassType;
 
-    public Endpoint(HttpString method, String path, BiConsumer<Req, Res> reqResBiConsumer) {
+    public Endpoint(HttpString method, String path, BiConsumer<Req, Res> reqResBiConsumer, Class<T> bodyClassType) {
         this.method = method;
         this.path = path;
         this.reqResBiConsumer = reqResBiConsumer;
+        this.bodyClassType = bodyClassType;
     }
 
     public String getPath() {
@@ -27,6 +29,10 @@ public class Endpoint implements Comparable<Endpoint> {
 
     public BiConsumer<Req, Res> getReqResBiConsumer() {
         return reqResBiConsumer;
+    }
+
+    public Class<T> getBodyClassType() {
+        return bodyClassType;
     }
 
     @Override

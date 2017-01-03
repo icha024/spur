@@ -21,7 +21,7 @@ import org.xnio.channels.StreamSourceChannel;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
 
-public class Req {
+public class Req<T> {
 
     private static Validator validator;
 
@@ -35,9 +35,13 @@ public class Req {
 
     private static Gson gson = new Gson();
     private HttpServerExchange httpServerExchange;
+    private T body;
 
-    public Req(HttpServerExchange httpServerExchange) {
+    private Class<T> bodyClassType;
+
+    public Req(HttpServerExchange httpServerExchange, Class<T> bodyClassType) {
         this.httpServerExchange = httpServerExchange;
+        this.bodyClassType = bodyClassType;
     }
 
     public HttpServerExchange getRawHttpServerExchange() {
@@ -52,27 +56,46 @@ public class Req {
         return httpServerExchange.getRequestHeaders();
     }
 
-    public StreamSourceChannel bodyAsStream() {
-        return httpServerExchange.getRequestChannel();
+//    public StreamSourceChannel bodyAsStream() {
+//        return httpServerExchange.getRequestChannel();
+//    }
+//
+//    public void bodyAsBytes(Consumer<byte[]> byteConsumer) {
+//        httpServerExchange.getRequestReceiver()
+//                .receiveFullBytes((exchange, bytes) -> byteConsumer.accept(bytes));
+//    }
+
+//    public void body(Consumer<String> stringConsumer) {
+//        httpServerExchange.getRequestReceiver()
+//                .receiveFullString((httpServerExchange1, s) -> stringConsumer.accept(s), StandardCharsets.UTF_8);
+//    }
+
+    public T body() {
+        return body;
     }
 
-    public void bodyAsBytes(Consumer<byte[]> byteConsumer) {
-        httpServerExchange.getRequestReceiver()
-                .receiveFullBytes((exchange, bytes) -> byteConsumer.accept(bytes));
-    }
-
-    public void body(Consumer<String> stringConsumer) {
-        httpServerExchange.getRequestReceiver()
-                .receiveFullString((httpServerExchange1, s) -> stringConsumer.accept(s), StandardCharsets.UTF_8);
-    }
-
-    public <T> void bodyAsValidatedObject(Consumer<T> jsonObjectConsumer, Class<T> t) {
+    protected void parseBody(Consumer objectConsumer) {
         httpServerExchange.getRequestReceiver()
                 .receiveFullString((exchange, str) -> {
+                    if (bodyClassType == null || bodyClassType.equals(Void.class)) {
+                        objectConsumer.accept(null);
+                        return;
+                    } else if (bodyClassType.equals(String.class)) {
+                        this.body = (T) str;
+                        objectConsumer.accept(str);
+                        return;
+                    }
+
                     T parsedType;
                     try {
-                        parsedType = gson.fromJson(str, t);
+                        parsedType = gson.fromJson(str, bodyClassType);
                     } catch (JsonParseException jpe) {
+                        exchange.setStatusCode(400);
+                        exchange.endExchange();
+                        return;
+                    }
+
+                    if (parsedType == null) {
                         exchange.setStatusCode(400);
                         exchange.endExchange();
                         return;
@@ -80,7 +103,8 @@ public class Req {
 
                     Set<ConstraintViolation<T>> constraintViolations = validator.validate(parsedType);
                     if (constraintViolations.isEmpty()) {
-                        jsonObjectConsumer.accept(parsedType);
+                        this.body = parsedType;
+                        objectConsumer.accept(parsedType);
                     } else {
                         exchange.setStatusCode(400);
                         exchange.getResponseSender()
@@ -92,10 +116,10 @@ public class Req {
                     }
                 }, StandardCharsets.UTF_8);
     }
-
-    public long bodyLength() {
-        return httpServerExchange.getRequestContentLength();
-    }
+//
+//    public long bodyLength() {
+//        return httpServerExchange.getRequestContentLength();
+//    }
 
     private class InvalidValues {
         private List<String> invalidValues;

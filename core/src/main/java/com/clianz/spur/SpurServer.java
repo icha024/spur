@@ -50,6 +50,7 @@ public class SpurServer {
             // res.send("Hello Again!");
             res.send(new SpurOptions());
         });
+        post("/a", (req, res) -> res.send(new SpurOptions()), SpurOptions.class);
         start(SpurOptions.gzipEnabled(true));
     }
 
@@ -80,8 +81,12 @@ public class SpurServer {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
             Endpoint endpoint = methodEndpointMap.get(exchange.getRequestMethod());
+            LOGGER.info("Found method: " + endpoint.getMethod());
             if (endpoint != null) {
-                endpoint.getReqResBiConsumer().accept(new Req(exchange), new Res(exchange));
+                Req req = new Req(exchange, endpoint.getBodyClassType());
+                Res res = new Res(exchange);
+                req.parseBody(body -> endpoint.getReqResBiConsumer()
+                        .accept(req, res));
             }
         }));
 
@@ -107,27 +112,28 @@ public class SpurServer {
     }
 
     public static SpurServer get(String path, BiConsumer<Req, Res> reqRes) {
-        return setPathHandler("GET", path, reqRes);
+        return setPathHandler("GET", path, reqRes, null);
     }
 
-    public static SpurServer put(String path, BiConsumer<Req, Res> reqRes) {
-        return setPathHandler("PUT", path, reqRes);
+    public static <T> SpurServer put(String path, BiConsumer<Req, Res> reqRes, Class<T> bodyClass) {
+        return setPathHandler("PUT", path, reqRes, bodyClass);
     }
 
-    public static SpurServer post(String path, BiConsumer<Req, Res> reqRes) {
-        return setPathHandler("POST", path, reqRes);
+    public static <T> SpurServer post(String path, BiConsumer<Req, Res> reqRes, Class<T> bodyClass) {
+        return setPathHandler("POST", path, reqRes, bodyClass);
     }
 
     public static SpurServer delete(String path, BiConsumer<Req, Res> reqRes) {
-        return setPathHandler("DELETE", path, reqRes);
+        return setPathHandler("DELETE", path, reqRes, null);
     }
 
-    private static SpurServer setPathHandler(String method, String path, BiConsumer<Req, Res> reqRes) {
+    private static <T> SpurServer setPathHandler(String method, String path, BiConsumer<Req, Res> reqRes, Class<T> classType) {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
         endpointsMap.putIfAbsent(path, new HashMap<>());
-        endpointsMap.get(path).put(new HttpString(method), new Endpoint(new HttpString(method), path, reqRes));
+        endpointsMap.get(path)
+                .put(new HttpString(method), new Endpoint(new HttpString(method), path, reqRes, classType));
         return server;
     }
 
