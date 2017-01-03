@@ -59,19 +59,23 @@ public class SpurServer {
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
 
+    private SpurServer() {
+    }
+
     public static void main(final String[] args) {
         get("/", (req, res) -> {
             LOGGER.info("Call GET on root");
-            // res.send("Hello Again!");
             res.send(new SpurOptions());
         });
-        post("/a", String.class, (req, res) -> {
-            res.send(req.body());
-        });
+
+        get("/hello", (req, res) -> res.send("Hello world!"));
+
+        post("/a", String.class, (req, res) -> res.send(req.body()));
+
         delete("/a", (req, res) -> res.send("something gone"));
 
         start(SpurOptions.enableGzip(true)
-                .enableCorsHeaders("a"));
+                .enableCorsHeaders("*"));
     }
 
     public static void start() {
@@ -182,7 +186,7 @@ public class SpurServer {
         if (methodsDefined.contains(GET)) {
             methodsDefined.add(HEAD);
         }
-        if (options.corsHeaders.size() > 0) {
+        if (!options.corsHeaders.isEmpty()) {
             methodsDefined.add(OPTIONS);
         }
 

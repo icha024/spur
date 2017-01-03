@@ -6,18 +6,18 @@ import java.util.stream.Collectors;
 
 public class SpurOptions {
 
-    private static final String DEFAULT_HOST = "0.0.0.0";
-    private static final int DEFAULT_PORT = 8080;
     private static SpurOptions option = new SpurOptions();
 
     protected boolean gzipEnabled = false;
-    protected String host = getEnvProperty("HOST", DEFAULT_HOST);
-    protected Integer port = getEnvProperty("PORT", DEFAULT_PORT);
+    protected String host = getEnvProperty("HOST", "0.0.0.0");
+    protected Integer port = getEnvProperty("PORT", 8080);
     protected Boolean http2Enabled = true;
     protected int requestParseTimeOut = 2000;
     protected long maxEntitySize = 1024L * 1024L;
     protected long gzipMaxSize = 860L;
     protected List<String> corsHeaders = parseCorsString(getEnvProperty("CORS", ""));
+
+    protected SpurOptions() {}
 
     public static SpurOptions enableCorsHeaders(String corsHeaders) {
         option.corsHeaders = parseCorsString(corsHeaders);

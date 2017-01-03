@@ -18,7 +18,7 @@ public class Res {
     private static Gson gson = new Gson();
     private HttpServerExchange httpServerExchange;
 
-    public Res(HttpServerExchange httpServerExchange) {
+    protected Res(HttpServerExchange httpServerExchange) {
         this.httpServerExchange = httpServerExchange;
     }
 

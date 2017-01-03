@@ -37,7 +37,7 @@ public class Req<T> {
 
     private Class<T> bodyClassType;
 
-    public Req(HttpServerExchange httpServerExchange, Class<T> bodyClassType) {
+    protected Req(HttpServerExchange httpServerExchange, Class<T> bodyClassType) {
         this.httpServerExchange = httpServerExchange;
         this.bodyClassType = bodyClassType;
     }
@@ -60,9 +60,7 @@ public class Req<T> {
 
     protected void parseBody(Consumer objectConsumer) {
         httpServerExchange.getRequestReceiver()
-                .receiveFullString((exchange, str) -> {
-                    convertBodyStringToObj(objectConsumer, exchange, str);
-                }, StandardCharsets.UTF_8);
+                .receiveFullString((exchange, str) -> convertBodyStringToObj(objectConsumer, exchange, str), StandardCharsets.UTF_8);
     }
 
     private void convertBodyStringToObj(Consumer objectConsumer, HttpServerExchange exchange, String str) {
