@@ -22,13 +22,20 @@ import static com.clianz.spur.internal.HttpMethods.OPTIONS;
 import static com.clianz.spur.internal.HttpMethods.POST;
 import static com.clianz.spur.internal.HttpMethods.PUT;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import com.clianz.spur.internal.Endpoint;
 
@@ -59,6 +66,8 @@ public class SpurServer {
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
 
+    private static List<Endpoint> preFilters = new ArrayList<>();
+
     private SpurServer() {
     }
 
@@ -73,6 +82,8 @@ public class SpurServer {
         post("/a", String.class, (req, res) -> res.send(req.body()));
 
         delete("/a", (req, res) -> res.send("something gone"));
+
+        pre("/", (req, res) -> LOGGER.info("Let's run this prefilter..."));
 
         start(SpurOptions.enableGzip(true)
                 .enableCorsHeaders("*"));
@@ -104,7 +115,7 @@ public class SpurServer {
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
-            createPathTemplateHandler(options, methodEndpointMap, exchange);
+            getPathTemplateHandler(options, methodEndpointMap, exchange);
         }));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
@@ -121,16 +132,41 @@ public class SpurServer {
         return gracefulShutdownHandler;
     }
 
-    private static void createPathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
+    private static void getPathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
             HttpServerExchange exchange) {
-        HttpString requestMethod = exchange.getRequestMethod();
 
+        LOGGER.info("Exchange path: " + exchange.getRequestPath());
+
+//        Req req = new Req(exchange, null);
+//        Res res = new Res(exchange);
+//        CompletableFuture[] preFiltersRun = preFilters.parallelStream()
+//                .filter(endpoint -> endpoint.getPath()
+//                        .startsWith(exchange.getRequestPath()))
+//                .map(endpoint -> CompletableFuture.runAsync(() -> endpoint.getReqResBiConsumer()
+//                        .accept(req, res)))
+//                .collect(Collectors.toList())
+//                .toArray(new CompletableFuture[0]);
+//        CompletableFuture.allOf(preFiltersRun)
+//                .thenRunAsync(() -> handlePathOperations(options, methodEndpointsMap, exchange));
+        
+        handlePathOperations(options, methodEndpointsMap, exchange);
+    }
+
+    private static void handlePathOperations(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
+            HttpServerExchange exchange) {
+        LOGGER.info("handlePathOperations");
+//        if (exchange.isComplete()) {
+//            LOGGER.info("exchange.isComplete() -> true");
+//            return;
+//        }
+
+        HttpString requestMethod = exchange.getRequestMethod();
         String requestAccessControlRequestMethod = getRequestHeader(exchange, ACCESS_CONTROL_REQUEST_METHOD);
         String requestOrigin = getRequestHeader(exchange, Headers.ORIGIN);
         if (requestMethod.equals(HEAD)) {
             requestMethod = GET;
         } else if (requestMethod.equals(OPTIONS) && requestAccessControlRequestMethod != null && methodEndpointsMap.containsKey(
-                new HttpString(requestAccessControlRequestMethod)) && isValidCORSOrigin(options, requestOrigin)) {
+                new HttpString(requestAccessControlRequestMethod)) && isValidCorsOrigin(options, requestOrigin)) {
             setCorsOriginHeader(exchange, requestOrigin);
             setCorsMethodHeader(options, methodEndpointsMap, exchange);
             exchange.endExchange();
@@ -147,7 +183,7 @@ public class SpurServer {
         }
 
         LOGGER.info("Found method: " + endpoint.getMethod());
-        if (isValidCORSOrigin(options, requestOrigin)) {
+        if (isValidCorsOrigin(options, requestOrigin)) {
             setCorsOriginHeader(exchange, requestOrigin);
         }
         Req req = new Req(exchange, endpoint.getBodyClassType());
@@ -166,7 +202,7 @@ public class SpurServer {
         return null;
     }
 
-    private static boolean isValidCORSOrigin(SpurOptions options, String requestOrigin) {
+    private static boolean isValidCorsOrigin(SpurOptions options, String requestOrigin) {
         return options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin);
     }
 
@@ -218,6 +254,14 @@ public class SpurServer {
         return setPathHandler(DELETE, path, reqRes, null);
     }
 
+    public static SpurServer pre(String pathPrefix, BiConsumer<Req, Res> reqRes) {
+        if (serverStarted.get()) {
+            throw new IllegalStateException(SERVER_ALREADY_STARTED);
+        }
+        preFilters.add(new Endpoint(null, pathPrefix, reqRes, null));
+        return server;
+    }
+
     private static <T> SpurServer setPathHandler(HttpString method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
         if (serverStarted.get()) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
@@ -234,6 +278,7 @@ public class SpurServer {
             // non-blocking
             if (exchange.isInIoThread()) {
                 // LOGGER.info("Is in IO thread");
+//                exchange.dispatch(ForkJoinPool.commonPool(), this);
                 exchange.dispatch(this);
                 return;
             }
