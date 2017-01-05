@@ -9,6 +9,7 @@ public class SpurOptions {
     private static SpurOptions option = new SpurOptions();
 
     protected boolean gzipEnabled = false;
+    protected boolean blockable = false;
     protected String host = getEnvProperty("HOST", "localhost");
     protected Integer port = getEnvProperty("PORT", 8080);
     protected Boolean http2Enabled = true;
@@ -28,6 +29,11 @@ public class SpurOptions {
         return Arrays.stream(corsString.split(","))
                 .map(String::trim)
                 .collect(Collectors.toList());
+    }
+
+    public static SpurOptions enableBlockableHandlers(boolean blockable) {
+        option.blockable = blockable;
+        return option;
     }
 
     public static SpurOptions enableGzip(boolean gzipEnabled) {

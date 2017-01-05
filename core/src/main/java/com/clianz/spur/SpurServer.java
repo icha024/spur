@@ -58,6 +58,7 @@ public class SpurServer {
     private static Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
+    private static SpurOptions serverOptions;
 
     private SpurServer() {
     }
@@ -75,7 +76,8 @@ public class SpurServer {
         delete("/a", (req, res) -> res.send("something gone"));
 
         start(SpurOptions.enableGzip(true)
-                .enableCorsHeaders("*"));
+                .enableCorsHeaders("*")
+                .enableBlockableHandlers(false));
     }
 
     public static void start() {
@@ -90,6 +92,7 @@ public class SpurServer {
         if (serverStarted.getAndSet(true)) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
+        SpurServer.serverOptions = options;
 
         LOGGER.info("Listening to " + options.host + ":" + options.port);
         Undertow server = builder.addHttpListener(options.port, options.host)
@@ -231,12 +234,12 @@ public class SpurServer {
     private interface AsyncHttpHandler extends HttpHandler {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
             // non-blocking
-            //            if (exchange.isInIoThread()) {
-            //                // LOGGER.info("Is in IO thread");
-            ////                exchange.dispatch(ForkJoinPool.commonPool(), this);
-            //                exchange.dispatch(this);
-            //                return;
-            //            }
+            if (serverOptions.blockable && exchange.isInIoThread()) {
+                LOGGER.info("Is in IO thread, dispatching for blockable...");
+                //                exchange.dispatch(ForkJoinPool.commonPool(), this);
+                exchange.dispatch(this);
+                return;
+            }
             // handler code
             // LOGGER.info("STARTING Async");
             asyncBlockingHandler(exchange);
