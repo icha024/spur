@@ -63,7 +63,7 @@ public class SpurServer {
     private SpurServer() {
     }
 
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws Exception {
         get("/", (req, res) -> {
             LOGGER.info("Call GET on root");
             res.send(new SpurOptions());
@@ -77,7 +77,8 @@ public class SpurServer {
 
         start(SpurOptions.enableGzip(true)
                 .enableCorsHeaders("*")
-                .enableBlockableHandlers(false));
+                .enableBlockableHandlers(false)
+                .enableHttps(true).sslContext(null, null, "password"));
     }
 
     public static void start() {
@@ -95,6 +96,17 @@ public class SpurServer {
         SpurServer.serverOptions = options;
 
         LOGGER.info("Listening to " + options.host + ":" + options.port);
+
+        if (options.httpsEnabled) {
+            if (options.sslContext == null) {
+                throw new IllegalArgumentException(("HTTPS/SSL context must be configured when HTTPS is enabled"));
+            } else if (options.httpsPort == 0) {
+                throw new IllegalArgumentException(("HTTPS port must be configured when HTTPS is enabled"));
+            }
+            builder = builder.addHttpsListener(options.httpsPort, options.host, options.sslContext);
+            LOGGER.info("HTTPS Enabled");
+        }
+
         Undertow server = builder.addHttpListener(options.port, options.host)
                 .setServerOption(UndertowOptions.REQUEST_PARSE_TIMEOUT, options.requestParseTimeOut)
                 .setServerOption(UndertowOptions.ENABLE_HTTP2, options.http2Enabled)
@@ -234,8 +246,8 @@ public class SpurServer {
     private interface AsyncHttpHandler extends HttpHandler {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
             // non-blocking
-            if (serverOptions.blockable && exchange.isInIoThread()) {
-                LOGGER.info("Is in IO thread, dispatching for blockable...");
+            if (serverOptions.blockableHandlersEnabled && exchange.isInIoThread()) {
+                LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
                 //                exchange.dispatch(ForkJoinPool.commonPool(), this);
                 exchange.dispatch(this);
                 return;
