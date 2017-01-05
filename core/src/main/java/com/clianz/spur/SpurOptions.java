@@ -34,16 +34,7 @@ public class SpurOptions {
     protected String truststorePath = getEnvProperty("TRUSTSTORE", "");
     protected String keystorePassword = getEnvProperty("KEYSTORE_PASSWORD", "password");
 
-    protected SpurOptions() {
-//        try {
-//            sslContext = createSSLContext(loadStore("server.keystore", keystorePath, keystorePassword),
-//                    loadStore("server.truststore", truststorePath, keystorePassword), keystorePassword);
-//        } catch (Exception e) {
-//            LOGGER.throwing("SpurOptions", "SpurOptions", e);
-//            throw new RuntimeException(
-//                    "Can not create SSL context from properties: KEYSTORE=" + keystorePath + " TRUSTSTORE=" + truststorePath);
-//        }
-    }
+    protected SpurOptions() {}
 
     public static SpurOptions enableCorsHeaders(String corsHeaders) {
         option.corsHeaders = parseCorsString(corsHeaders);
@@ -130,8 +121,8 @@ public class SpurOptions {
     }
 
     protected SSLContext getSslContext() throws Exception {
-        return createSSLContext(loadStore("example/server.keystore", keystorePath, keystorePassword),
-                loadStore("example/server.truststore", truststorePath, keystorePassword), keystorePassword);
+        return createSSLContext(loadStore("server.keystore", keystorePath, keystorePassword),
+                loadStore("server.truststore", truststorePath, keystorePassword), keystorePassword);
     }
 
     // https://github.com/undertow-io/undertow/blob/master/examples/src/main/java/io/undertow/examples/http2/Http2Server.java
