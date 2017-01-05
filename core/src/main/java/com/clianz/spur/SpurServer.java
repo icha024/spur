@@ -29,6 +29,7 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.logging.Logger;
+import javax.net.ssl.SSLContext;
 
 import com.clianz.spur.internal.Endpoint;
 
@@ -78,7 +79,8 @@ public class SpurServer {
         start(SpurOptions.enableGzip(true)
                 .enableCorsHeaders("*")
                 .enableBlockableHandlers(false)
-                .enableHttps(true).sslContext(null, null, "password"));
+                .enableHttps(true)
+                .sslContext(null, null, "password"));
     }
 
     public static void start() {
@@ -98,12 +100,20 @@ public class SpurServer {
         LOGGER.info("Listening to " + options.host + ":" + options.port);
 
         if (options.httpsEnabled) {
-            if (options.sslContext == null) {
+            SSLContext sslContext = null;
+            try {
+                sslContext = options.getSslContext();
+            } catch (Exception e) {
+                LOGGER.throwing("SpurOptions", "SpurOptions", e);
+                throw new RuntimeException("Can not create SSL context from properties: KEYSTORE=" + options.keystorePath + " TRUSTSTORE="
+                        + options.truststorePath);
+            }
+            if (sslContext == null) {
                 throw new IllegalArgumentException(("HTTPS/SSL context must be configured when HTTPS is enabled"));
             } else if (options.httpsPort == 0) {
                 throw new IllegalArgumentException(("HTTPS port must be configured when HTTPS is enabled"));
             }
-            builder = builder.addHttpsListener(options.httpsPort, options.host, options.sslContext);
+            builder = builder.addHttpsListener(options.httpsPort, options.host, sslContext);
             LOGGER.info("HTTPS Enabled");
         }
 

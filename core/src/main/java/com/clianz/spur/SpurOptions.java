@@ -19,23 +19,31 @@ public class SpurOptions {
     private static final Logger LOGGER = Logger.getLogger(SpurOptions.class.getName());
     private static SpurOptions option = new SpurOptions();
 
-    protected boolean gzipEnabled = false;
+    protected boolean gzipEnabled = getEnvProperty("ENABLE_GZIP", false);
     protected boolean blockableHandlersEnabled = false;
     protected String host = getEnvProperty("HOST", "localhost");
     protected Integer port = getEnvProperty("PORT", 8080);
     protected Integer httpsPort = getEnvProperty("HTTPS_PORT", 8443);
-    protected Boolean http2Enabled = true;
+    protected Boolean http2Enabled = getEnvProperty("ENABLE_HTTP2", true);
     protected int requestParseTimeOut = 2000;
     protected long maxEntitySize = 1024L * 1024L;
     protected long gzipMaxSize = 860L;
     protected List<String> corsHeaders = parseCorsString(getEnvProperty("CORS", ""));
-    protected boolean httpsEnabled = false;
-    protected SSLContext sslContext;
+    protected boolean httpsEnabled = getEnvProperty("ENABLE_HTTPS", false);
     protected String keystorePath = getEnvProperty("KEYSTORE", "");
     protected String truststorePath = getEnvProperty("TRUSTSTORE", "");
     protected String keystorePassword = getEnvProperty("KEYSTORE_PASSWORD", "password");
 
-    protected SpurOptions() {}
+    protected SpurOptions() {
+//        try {
+//            sslContext = createSSLContext(loadStore("server.keystore", keystorePath, keystorePassword),
+//                    loadStore("server.truststore", truststorePath, keystorePassword), keystorePassword);
+//        } catch (Exception e) {
+//            LOGGER.throwing("SpurOptions", "SpurOptions", e);
+//            throw new RuntimeException(
+//                    "Can not create SSL context from properties: KEYSTORE=" + keystorePath + " TRUSTSTORE=" + truststorePath);
+//        }
+    }
 
     public static SpurOptions enableCorsHeaders(String corsHeaders) {
         option.corsHeaders = parseCorsString(corsHeaders);
@@ -103,6 +111,11 @@ public class SpurOptions {
         return (propVal == null) ? System.getProperty(propName, defaultVal) : propVal;
     }
 
+    private static Boolean getEnvProperty(String propName, boolean defaultVal) {
+        String propVal = System.getenv(propName);
+        String finalVal = (propVal == null) ? System.getProperty(propName, String.valueOf(defaultVal)) : propVal;
+        return Boolean.valueOf(finalVal);
+    }
 
     public static SpurOptions enableHttps(boolean httpsEnabled) {
         option.httpsEnabled = httpsEnabled;
@@ -113,8 +126,12 @@ public class SpurOptions {
         option.keystorePath = keystorePath;
         option.keystorePassword = password;
         option.truststorePath = truststorePath;
-        option.sslContext = createSSLContext(loadStore("server.keystore", keystorePath, password), loadStore("server.truststore", truststorePath, password), password);
         return option;
+    }
+
+    protected SSLContext getSslContext() throws Exception {
+        return createSSLContext(loadStore("example/server.keystore", keystorePath, keystorePassword),
+                loadStore("example/server.truststore", truststorePath, keystorePassword), keystorePassword);
     }
 
     // https://github.com/undertow-io/undertow/blob/master/examples/src/main/java/io/undertow/examples/http2/Http2Server.java
@@ -139,9 +156,10 @@ public class SpurOptions {
     private static KeyStore loadStore(String defaultResourceName, String storeLoc, String password) throws Exception {
         InputStream stream = null;
         try {
-            if (storeLoc == null || storeLoc.length() == 0) {
+            if (storeLoc == null || storeLoc.isEmpty()) {
                 LOGGER.info("Get keystore from resource: " + defaultResourceName);
-                stream = SpurServer.class.getClassLoader().getResourceAsStream(defaultResourceName);
+                stream = SpurServer.class.getClassLoader()
+                        .getResourceAsStream(defaultResourceName);
             } else {
                 stream = Files.newInputStream(Paths.get(storeLoc));
             }
