@@ -83,7 +83,14 @@ public class SpurServer {
 
         delete("/a", (req, res) -> res.send("something gone"));
 
-        pre("/", (req, res) -> LOGGER.info("Let's run this prefilter..."));
+//        pre("/", (req, res) -> {
+////            try {
+////                Thread.sleep(1000);
+////            } catch (InterruptedException e) {
+////                e.printStackTrace();
+////            }
+//            LOGGER.info("Let's run this prefilter...");
+//        });
 
         start(SpurOptions.enableGzip(true)
                 .enableCorsHeaders("*"));
@@ -148,7 +155,7 @@ public class SpurServer {
 //                .toArray(new CompletableFuture[0]);
 //        CompletableFuture.allOf(preFiltersRun)
 //                .thenRunAsync(() -> handlePathOperations(options, methodEndpointsMap, exchange));
-        
+
         handlePathOperations(options, methodEndpointsMap, exchange);
     }
 
@@ -187,9 +194,10 @@ public class SpurServer {
             setCorsOriginHeader(exchange, requestOrigin);
         }
         Req req = new Req(exchange, endpoint.getBodyClassType());
-        Res res = new Res(exchange);
-        req.parseBody(body -> endpoint.getReqResBiConsumer()
-                .accept(req, res));
+        req.parseBody((newExchange, body) -> {
+            endpoint.getReqResBiConsumer()
+                    .accept(new Req(newExchange, endpoint.getBodyClassType()), new Res(newExchange));
+        });
     }
 
     private static String getRequestHeader(HttpServerExchange exchange, HttpString headerName) {
@@ -276,12 +284,12 @@ public class SpurServer {
     private interface AsyncHttpHandler extends HttpHandler {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
             // non-blocking
-            if (exchange.isInIoThread()) {
-                // LOGGER.info("Is in IO thread");
-//                exchange.dispatch(ForkJoinPool.commonPool(), this);
-                exchange.dispatch(this);
-                return;
-            }
+//            if (exchange.isInIoThread()) {
+//                // LOGGER.info("Is in IO thread");
+////                exchange.dispatch(ForkJoinPool.commonPool(), this);
+//                exchange.dispatch(this);
+//                return;
+//            }
             // handler code
             // LOGGER.info("STARTING Async");
             asyncBlockingHandler(exchange);

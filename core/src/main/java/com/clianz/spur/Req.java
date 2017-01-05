@@ -5,6 +5,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.validation.Configuration;
@@ -58,15 +59,15 @@ public class Req<T> {
         return body;
     }
 
-    protected void parseBody(Consumer objectConsumer) {
+    protected void parseBody(PostParseConsumer objectConsumer) {
         httpServerExchange.getRequestReceiver()
                 .receiveFullString((exchange, str) -> convertBodyStringToObj(objectConsumer, exchange, str), StandardCharsets.UTF_8);
     }
 
-    private void convertBodyStringToObj(Consumer objectConsumer, HttpServerExchange exchange, String str) {
+    private void convertBodyStringToObj(PostParseConsumer objectConsumer, HttpServerExchange exchange, String str) {
         if (bodyClassType == null || bodyClassType.equals(Void.class) || bodyClassType.equals(String.class)) {
             this.body = (T) str;
-            objectConsumer.accept(str);
+            objectConsumer.postParse(exchange, str);
             return;
         }
 
@@ -75,20 +76,20 @@ public class Req<T> {
             parsedType = gson.fromJson(str, bodyClassType);
         } catch (JsonParseException jpe) {
             exchange.setStatusCode(400);
-            exchange.endExchange();
+//            exchange.endExchange();
             return;
         }
 
         if (parsedType == null) {
             exchange.setStatusCode(400);
-            exchange.endExchange();
+//            exchange.endExchange();
             return;
         }
 
         Set<ConstraintViolation<T>> constraintViolations = validator.validate(parsedType);
         if (constraintViolations.isEmpty()) {
             this.body = parsedType;
-            objectConsumer.accept(parsedType);
+            objectConsumer.postParse(exchange, parsedType);
         } else {
             exchange.setStatusCode(400);
             exchange.getResponseSender()
@@ -96,7 +97,7 @@ public class Req<T> {
                             .map(violation -> violation.getPropertyPath()
                                     .toString())
                             .collect(Collectors.toList()))));
-            exchange.endExchange();
+//            exchange.endExchange();
         }
     }
 
@@ -110,6 +111,11 @@ public class Req<T> {
         public List<String> getInvalidValues() {
             return invalidValues;
         }
+    }
+
+    @FunctionalInterface
+    public interface PostParseConsumer<T> {
+        void postParse(HttpServerExchange exchange, T body);
     }
 
 }
