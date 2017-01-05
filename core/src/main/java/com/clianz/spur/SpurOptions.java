@@ -9,7 +9,7 @@ public class SpurOptions {
     private static SpurOptions option = new SpurOptions();
 
     protected boolean gzipEnabled = false;
-    protected String host = getEnvProperty("HOST", "0.0.0.0");
+    protected String host = getEnvProperty("HOST", "localhost");
     protected Integer port = getEnvProperty("PORT", 8080);
     protected Boolean http2Enabled = true;
     protected int requestParseTimeOut = 2000;

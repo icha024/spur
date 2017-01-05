@@ -5,8 +5,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.validation.Configuration;
 import javax.validation.ConstraintViolation;
@@ -76,13 +74,13 @@ public class Req<T> {
             parsedType = gson.fromJson(str, bodyClassType);
         } catch (JsonParseException jpe) {
             exchange.setStatusCode(400);
-//            exchange.endExchange();
+            exchange.endExchange();
             return;
         }
 
         if (parsedType == null) {
             exchange.setStatusCode(400);
-//            exchange.endExchange();
+            exchange.endExchange();
             return;
         }
 
@@ -97,7 +95,7 @@ public class Req<T> {
                             .map(violation -> violation.getPropertyPath()
                                     .toString())
                             .collect(Collectors.toList()))));
-//            exchange.endExchange();
+            exchange.endExchange();
         }
     }
 
