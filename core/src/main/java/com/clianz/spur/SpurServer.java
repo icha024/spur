@@ -21,7 +21,10 @@ import static com.clianz.spur.internal.HttpMethods.HEAD;
 import static com.clianz.spur.internal.HttpMethods.OPTIONS;
 import static com.clianz.spur.internal.HttpMethods.POST;
 import static com.clianz.spur.internal.HttpMethods.PUT;
+import static io.undertow.Handlers.path;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +43,7 @@ import io.undertow.predicate.Predicates;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.GracefulShutdownHandler;
+import io.undertow.server.handlers.PathHandler;
 import io.undertow.server.handlers.PathTemplateHandler;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
@@ -47,6 +51,10 @@ import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
+import io.undertow.websockets.core.AbstractReceiveListener;
+import io.undertow.websockets.core.BufferedTextMessage;
+import io.undertow.websockets.core.WebSocketChannel;
+import io.undertow.websockets.core.WebSockets;
 
 public class SpurServer {
 
@@ -61,17 +69,21 @@ public class SpurServer {
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
     private static SpurOptions serverOptions;
+    private static Set<WebSocketChannel> webSocketChannels = null;
+    private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
 
     private SpurServer() {
     }
 
     public static void main(final String[] args) throws Exception {
+        get("/hello", (req, res) -> res.send("Hello world!"));
+
         get("/", (req, res) -> {
             LOGGER.info("Call GET on root");
             res.send(new SpurOptions());
         });
 
-        get("/hello", (req, res) -> res.send("Hello world!"));
+        websocket("/web", sender -> sender.send("Welcome!"), (msg, sender) -> sender.send("I got your message: " + msg));
 
         post("/a", String.class, (req, res) -> res.send(req.body()));
 
@@ -130,7 +142,7 @@ public class SpurServer {
     private static HttpHandler getHandlers(SpurOptions options) {
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
-            getPathTemplateHandler(options, methodEndpointMap, exchange);
+            invokePathTemplateHandler(options, methodEndpointMap, exchange);
         }));
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
@@ -147,7 +159,26 @@ public class SpurServer {
         return gracefulShutdownHandler;
     }
 
-    private static void getPathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
+    private static PathHandler getWebSocketHandler(String pathPrefix, WebSocketOnConnect webSocketOnConnect,
+            WebSocketOnMessage webSocketOnMessage) {
+        return path().addPrefixPath(pathPrefix, Handlers.websocket((exchange, channel) -> {
+            if (webSocketChannels == null) {
+                webSocketChannels = channel.getPeerConnections();
+            }
+            WebSocketMessageSender sender = new WebSocketMessageSender(channel);
+            webSocketOnConnect.onConnect(sender);
+            channel.getReceiveSetter()
+                    .set(new AbstractReceiveListener() {
+                        @Override
+                        protected void onFullTextMessage(WebSocketChannel channel, BufferedTextMessage message) {
+                            webSocketOnMessage.onMessage(message.getData(), sender);
+                        }
+                    });
+            channel.resumeReceives();
+        }));
+    }
+
+    private static void invokePathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
             HttpServerExchange exchange) {
 
         HttpString requestMethod = exchange.getRequestMethod();
@@ -227,6 +258,15 @@ public class SpurServer {
         return builder;
     }
 
+    public static SpurServer websocket(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
+        webSocketHandlerMap.put(pathPrefix, new WebSocketHandler(pathPrefix, webSocketOnConnect, webSocketOnMessage));
+        return server;
+    }
+
+    public static void broadcastToAllWebsockets(String msg) {
+        new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+    }
+
     public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(GET, path, reqRes, null);
     }
@@ -269,6 +309,48 @@ public class SpurServer {
         }
 
         void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;
+    }
+
+    @FunctionalInterface
+    private interface WebSocketOnMessage {
+        void onMessage(String msg, WebSocketMessageSender sender);
+    }
+
+    @FunctionalInterface
+    private interface WebSocketOnConnect {
+        void onConnect(WebSocketMessageSender sender);
+    }
+
+    private static class WebSocketMessageSender {
+        WebSocketChannel channel;
+
+        public WebSocketMessageSender(WebSocketChannel channel) {
+            this.channel = channel;
+        }
+
+        void send(String msg) {
+            if (msg != null) {
+                WebSockets.sendText(msg, channel, null);
+            }
+        }
+
+        void send(ByteBuffer byteBuffer) {
+            if (byteBuffer != null) {
+                WebSockets.sendBinary(byteBuffer, channel, null);
+            }
+        }
+    }
+
+    private static class WebSocketHandler {
+        String pathPrefix;
+        WebSocketOnConnect webSocketOnConnect;
+        WebSocketOnMessage webSocketOnMessage;
+
+        public WebSocketHandler(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
+            this.pathPrefix = pathPrefix;
+            this.webSocketOnConnect = webSocketOnConnect;
+            this.webSocketOnMessage = webSocketOnMessage;
+        }
     }
 
     // https://github.com/undertow-io/undertow/blob/master/examples/src/main/java/io/undertow/examples/http2/Http2Server.java
