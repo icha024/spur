@@ -21,7 +21,6 @@ import static com.clianz.spur.internal.HttpMethods.HEAD;
 import static com.clianz.spur.internal.HttpMethods.OPTIONS;
 import static com.clianz.spur.internal.HttpMethods.POST;
 import static com.clianz.spur.internal.HttpMethods.PUT;
-import static io.undertow.Handlers.path;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -43,7 +42,6 @@ import io.undertow.predicate.Predicates;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.GracefulShutdownHandler;
-import io.undertow.server.handlers.PathHandler;
 import io.undertow.server.handlers.PathTemplateHandler;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
@@ -83,7 +81,13 @@ public class SpurServer {
             res.send(new SpurOptions());
         });
 
-        websocket("/web", sender -> sender.send("Welcome!"), (msg, sender) -> sender.send("I got your message: " + msg));
+        websocket("/myapp", sender -> {
+            LOGGER.info("A user has connected");
+            sender.send("Welcome!");
+        }, (msg, sender) -> {
+            sender.send("I got your message: " + msg);
+            LOGGER.info("User message received: " + msg);
+        });
 
         post("/a", String.class, (req, res) -> res.send(req.body()));
 
@@ -145,6 +149,13 @@ public class SpurServer {
             invokePathTemplateHandler(options, methodEndpointMap, exchange);
         }));
 
+        if (!webSocketHandlerMap.isEmpty()) {
+            webSocketHandlerMap.forEach((pathPrefix, webSocketHandler) -> {
+                LOGGER.info("Adding WS for path: " + webSocketHandler.getPath());
+                addWebSocketHandler(pathTemplateHandler, webSocketHandler);
+            });
+        }
+
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
                 new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
                         Predicates.maxContentSize(options.gzipMaxSize))).setNext(pathTemplateHandler);
@@ -159,19 +170,21 @@ public class SpurServer {
         return gracefulShutdownHandler;
     }
 
-    private static PathHandler getWebSocketHandler(String pathPrefix, WebSocketOnConnect webSocketOnConnect,
-            WebSocketOnMessage webSocketOnMessage) {
-        return path().addPrefixPath(pathPrefix, Handlers.websocket((exchange, channel) -> {
+    private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
+        // TODO: Add security/auth
+        pathTemplateHandler.add(webSocketHandler.getPath(), Handlers.websocket((exchange, channel) -> {
             if (webSocketChannels == null) {
                 webSocketChannels = channel.getPeerConnections();
             }
             WebSocketMessageSender sender = new WebSocketMessageSender(channel);
-            webSocketOnConnect.onConnect(sender);
+            webSocketHandler.getWebSocketOnConnect()
+                    .onConnect(sender);
             channel.getReceiveSetter()
                     .set(new AbstractReceiveListener() {
                         @Override
                         protected void onFullTextMessage(WebSocketChannel channel, BufferedTextMessage message) {
-                            webSocketOnMessage.onMessage(message.getData(), sender);
+                            webSocketHandler.getWebSocketOnMessage()
+                                    .onMessage(message.getData(), sender);
                         }
                     });
             channel.resumeReceives();
@@ -342,14 +355,26 @@ public class SpurServer {
     }
 
     private static class WebSocketHandler {
-        String pathPrefix;
+        String path;
         WebSocketOnConnect webSocketOnConnect;
         WebSocketOnMessage webSocketOnMessage;
 
-        public WebSocketHandler(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
-            this.pathPrefix = pathPrefix;
+        public WebSocketHandler(String path, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
+            this.path = path;
             this.webSocketOnConnect = webSocketOnConnect;
             this.webSocketOnMessage = webSocketOnMessage;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public WebSocketOnConnect getWebSocketOnConnect() {
+            return webSocketOnConnect;
+        }
+
+        public WebSocketOnMessage getWebSocketOnMessage() {
+            return webSocketOnMessage;
         }
     }
 
