@@ -46,6 +46,7 @@ import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
+import io.undertow.util.StatusCodes;
 
 public class SpurServer {
 
@@ -164,7 +165,7 @@ public class SpurServer {
 
         Endpoint endpoint = methodEndpointsMap.get(requestMethod);
         if (endpoint == null) {
-            exchange.setStatusCode(405);
+            exchange.setStatusCode(StatusCodes.METHOD_NOT_ALLOWED);
             exchange.getResponseHeaders()
                     .put(Headers.ALLOW, getAllowedMethods(methodEndpointsMap, options));
             exchange.endExchange();
@@ -268,5 +269,16 @@ public class SpurServer {
         }
 
         void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;
+    }
+
+    // https://github.com/undertow-io/undertow/blob/master/examples/src/main/java/io/undertow/examples/http2/Http2Server.java
+    private class ForceHttpsHandler implements HttpHandler {
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            exchange.getResponseHeaders()
+                    .add(Headers.LOCATION,
+                            "https://" + exchange.getHostName() + ":" + (exchange.getHostPort() + 363) + exchange.getRelativePath());
+            exchange.setStatusCode(StatusCodes.TEMPORARY_REDIRECT);
+        }
     }
 }

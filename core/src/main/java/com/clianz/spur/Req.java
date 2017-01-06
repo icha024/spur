@@ -17,6 +17,7 @@ import com.google.gson.JsonParseException;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
+import io.undertow.util.StatusCodes;
 
 public class Req<T> {
 
@@ -73,13 +74,13 @@ public class Req<T> {
         try {
             parsedType = gson.fromJson(str, bodyClassType);
         } catch (JsonParseException jpe) {
-            exchange.setStatusCode(400);
+            exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.endExchange();
             return;
         }
 
         if (parsedType == null) {
-            exchange.setStatusCode(400);
+            exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.endExchange();
             return;
         }
@@ -89,7 +90,7 @@ public class Req<T> {
             this.body = parsedType;
             objectConsumer.postParse(exchange, parsedType);
         } else {
-            exchange.setStatusCode(400);
+            exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.getResponseSender()
                     .send(gson.toJson(new InvalidValues(constraintViolations.stream()
                             .map(violation -> violation.getPropertyPath()
