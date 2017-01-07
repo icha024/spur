@@ -24,7 +24,6 @@ import static com.clianz.spur.helpers.HttpMethods.PUT;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -160,7 +159,9 @@ public class SpurServer {
             secureRedirectHandler = gracefulShutdownHandler;
         }
 
-        return secureRedirectHandler;
+        return Handlers.predicate(exchange -> isValidCorsOrigin(options, getRequestHeader(exchange, Headers.ORIGIN)),
+                new CorsHandler(secureRedirectHandler, options), secureRedirectHandler);
+
     }
 
     private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
@@ -200,7 +201,6 @@ public class SpurServer {
             requestMethod = GET;
         } else if (requestMethod.equals(OPTIONS) && requestAccessControlRequestMethod != null && methodEndpointsMap.containsKey(
                 new HttpString(requestAccessControlRequestMethod)) && isValidCorsOrigin(options, requestOrigin)) {
-            setCorsOriginHeader(exchange, requestOrigin);
             setCorsMethodHeader(options, methodEndpointsMap, exchange);
             exchange.endExchange();
             return;
@@ -215,12 +215,9 @@ public class SpurServer {
             return;
         }
 
-        if (isValidCorsOrigin(options, requestOrigin)) {
-            setCorsOriginHeader(exchange, requestOrigin);
-        }
         Req req = new Req(exchange, endpoint.getBodyClassType());
         req.parseBody((newExchange, body) -> endpoint.getReqResBiConsumer()
-//                .accept(new Req(newExchange, endpoint.getBodyClassType()), new Res(newExchange)));
+                //                .accept(new Req(newExchange, endpoint.getBodyClassType()), new Res(newExchange)));
                 .accept(req, new Res(newExchange)));
     }
 
@@ -236,11 +233,6 @@ public class SpurServer {
 
     private static boolean isValidCorsOrigin(SpurOptions options, String requestOrigin) {
         return options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin);
-    }
-
-    private static void setCorsOriginHeader(HttpServerExchange exchange, String requestOrigin) {
-        exchange.getResponseHeaders()
-                .put(ACCESS_CONTROL_ALLOW_ORIGIN, requestOrigin);
     }
 
     private static void setCorsMethodHeader(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange) {
@@ -306,7 +298,8 @@ public class SpurServer {
     public static void broadcastSse(String path, String data) {
         ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
         if (serverSentEventHandler != null) {
-            serverSentEventHandler.getConnections().forEach(serverSentEventConnection -> serverSentEventConnection.send(data));
+            serverSentEventHandler.getConnections()
+                    .forEach(serverSentEventConnection -> serverSentEventConnection.send(data));
         }
     }
 
@@ -386,6 +379,21 @@ public class SpurServer {
                     .add(Headers.LOCATION,
                             "https://" + exchange.getHostName() + ":" + (exchange.getHostPort() + 363) + exchange.getRelativePath());
             exchange.setStatusCode(StatusCodes.TEMPORARY_REDIRECT);
+        }
+    }
+
+    private static class CorsHandler implements HttpHandler {
+        private HttpHandler next;
+
+        public CorsHandler(HttpHandler next, SpurOptions options) {
+            this.next = next;
+        }
+
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            exchange.getResponseHeaders()
+                    .put(ACCESS_CONTROL_ALLOW_ORIGIN, getRequestHeader(exchange, Headers.ORIGIN));
+            this.next.handleRequest(exchange);
         }
     }
 }
