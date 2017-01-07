@@ -24,9 +24,13 @@ import static com.clianz.spur.helpers.HttpMethods.PUT;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
@@ -49,6 +53,7 @@ import io.undertow.server.handlers.PathTemplateHandler;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
+import io.undertow.server.handlers.sse.ServerSentEventHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
@@ -70,9 +75,9 @@ public class SpurServer {
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
     public static SpurOptions spurOptions = new SpurOptions();
-    //    private static Set<WebSocketChannel> webSocketChannels = null;
     private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
     private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
+    private static Map<String, ServerSentEventHandler> sseHandlerMap = new HashMap<>();
 
     private SpurServer() {
     }
@@ -131,6 +136,10 @@ public class SpurServer {
                 LOGGER.info("Adding WS for path: " + webSocketHandler.getPath());
                 addWebSocketHandler(pathTemplateHandler, webSocketHandler);
             });
+        }
+
+        if (!sseHandlerMap.isEmpty()) {
+            sseHandlerMap.forEach(pathTemplateHandler::add);
         }
 
         EncodingHandler gzipEncodingHandler = new EncodingHandler(
@@ -280,6 +289,24 @@ public class SpurServer {
             new ArrayList<>(webSocketChannels).stream()
                     .filter(webSocketChannel -> channelAttributeValueTest.test(webSocketChannel.getAttribute(channelAttributeKey)))
                     .forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+        }
+    }
+
+    public static SpurServer schedule(long intervalSeconds, Runnable runnable) {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        scheduler.scheduleAtFixedRate(runnable, 0, intervalSeconds, TimeUnit.SECONDS);
+        return server;
+    }
+
+    public static SpurServer sse(String path) {
+        sseHandlerMap.put(path, Handlers.serverSentEvents());
+        return server;
+    }
+
+    public static void broadcastSse(String path, String data) {
+        ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
+        if (serverSentEventHandler != null) {
+            serverSentEventHandler.getConnections().forEach(serverSentEventConnection -> serverSentEventConnection.send(data));
         }
     }
 

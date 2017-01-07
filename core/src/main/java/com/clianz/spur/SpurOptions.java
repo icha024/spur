@@ -99,22 +99,6 @@ public class SpurOptions {
         return option;
     }
 
-    private static Integer getEnvProperty(String propName, Integer defaultVal) {
-        String propVal = System.getenv(propName);
-        return (propVal == null) ? Integer.getInteger(propName, defaultVal) : Integer.parseInt(propVal);
-    }
-
-    private static String getEnvProperty(String propName, String defaultVal) {
-        String propVal = System.getenv(propName);
-        return (propVal == null) ? System.getProperty(propName, defaultVal) : propVal;
-    }
-
-    private static Boolean getEnvProperty(String propName, boolean defaultVal) {
-        String propVal = System.getenv(propName);
-        String finalVal = (propVal == null) ? System.getProperty(propName, String.valueOf(defaultVal)) : propVal;
-        return Boolean.valueOf(finalVal);
-    }
-
     public SpurOptions enableHttps(boolean httpsEnabled) {
         option.httpsEnabled = httpsEnabled;
         return option;
@@ -175,5 +159,21 @@ public class SpurOptions {
                 stream.close();
             }
         }
+    }
+
+    private static Integer getEnvProperty(String propName, Integer defaultVal) {
+        String propVal = System.getenv(propName);
+        return (propVal == null) ? Integer.getInteger(propName, defaultVal) : Integer.parseInt(propVal);
+    }
+
+    private static String getEnvProperty(String propName, String defaultVal) {
+        String propVal = System.getenv(propName);
+        return (propVal == null) ? System.getProperty(propName, defaultVal) : propVal;
+    }
+
+    private static Boolean getEnvProperty(String propName, boolean defaultVal) {
+        String propVal = System.getenv(propName);
+        String finalVal = (propVal == null) ? System.getProperty(propName, String.valueOf(defaultVal)) : propVal;
+        return Boolean.valueOf(finalVal);
     }
 }

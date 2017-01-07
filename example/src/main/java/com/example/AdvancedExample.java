@@ -1,11 +1,14 @@
 package com.example;
 
+import static com.clianz.spur.SpurServer.broadcastSse;
 import static com.clianz.spur.SpurServer.broadcastWebsockets;
 import static com.clianz.spur.SpurServer.delete;
 import static com.clianz.spur.SpurServer.get;
 import static com.clianz.spur.SpurServer.post;
 import static com.clianz.spur.SpurServer.put;
+import static com.clianz.spur.SpurServer.schedule;
 import static com.clianz.spur.SpurServer.spurOptions;
+import static com.clianz.spur.SpurServer.sse;
 import static com.clianz.spur.SpurServer.start;
 import static com.clianz.spur.SpurServer.websocket;
 
@@ -51,6 +54,10 @@ public class AdvancedExample {
         broadcastWebsockets("/myapp",
                 "This message will broadcast to all websocket users on the path, if the value store for the key returns is true", "attrKey",
                 attrVal -> attrVal != null);
+
+        sse("/sse");
+
+        schedule(5, () -> broadcastSse("/sse", "Hello by SSE"));
 
         start(spurOptions.enableGzip(true)
                 .enableCorsHeaders("*")
