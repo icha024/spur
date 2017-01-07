@@ -32,11 +32,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
 
+import com.clianz.spur.helpers.CorsHandler;
 import com.clianz.spur.helpers.Endpoint;
+import com.clianz.spur.helpers.RedirectHttpsHandler;
+import com.clianz.spur.helpers.WebSocketHandler;
 import com.clianz.spur.helpers.WebSocketMessageSender;
 import com.clianz.spur.helpers.WebSocketOnConnect;
 import com.clianz.spur.helpers.WebSocketOnMessage;
@@ -52,6 +56,7 @@ import io.undertow.server.handlers.PathTemplateHandler;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
+import io.undertow.server.handlers.sse.ServerSentEventConnection;
 import io.undertow.server.handlers.sse.ServerSentEventHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -65,15 +70,15 @@ public class SpurServer {
 
     private static final Logger LOGGER = Logger.getLogger(SpurServer.class.getName());
     private static final String SERVER_ALREADY_STARTED = "Server already started.";
-    private static final SpurServer server = new SpurServer();
     private static final HttpString ACCESS_CONTROL_REQUEST_METHOD = new HttpString("Access-Control-Request-Method");
-    private static final HttpString ACCESS_CONTROL_ALLOW_ORIGIN = new HttpString("Access-Control-Allow-Origin");
     private static final HttpString ACCESS_CONTROL_ALLOW_METHOD = new HttpString("Access-Control-Allow-Methods");
-
     private static Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
+
+    private static final SpurServer server = new SpurServer();
+    public static SpurOptions spurOptions = new SpurOptions();
+
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
-    public static SpurOptions spurOptions = new SpurOptions();
     private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
     private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
     private static Map<String, ServerSentEventHandler> sseHandlerMap = new HashMap<>();
@@ -87,6 +92,78 @@ public class SpurServer {
 
     public static void start(SpurOptions options) {
         startServer(options);
+    }
+
+    public static Undertow.Builder rawUndertowBuilder() {
+        if (serverStarted.get()) {
+            throw new IllegalStateException(SERVER_ALREADY_STARTED);
+        }
+        return builder;
+    }
+
+    public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
+        return setPathHandler(GET, path, reqRes, null);
+    }
+
+    public static <T> SpurServer put(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
+        return setPathHandler(PUT, path, reqRes, requestBodyClass);
+    }
+
+    public static <T> SpurServer post(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
+        return setPathHandler(POST, path, reqRes, requestBodyClass);
+    }
+
+    public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
+        return setPathHandler(DELETE, path, reqRes, null);
+    }
+
+    public static SpurServer schedule(long intervalSeconds, Runnable runnable) {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        scheduler.scheduleAtFixedRate(runnable, 0, intervalSeconds, TimeUnit.SECONDS);
+        return server;
+    }
+
+    public static SpurServer sse(String path) {
+        sseHandlerMap.put(path, Handlers.serverSentEvents());
+        return server;
+    }
+
+    public static SpurServer websocket(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
+        webSocketHandlerMap.put(pathPrefix, new WebSocketHandler(pathPrefix, webSocketOnConnect, webSocketOnMessage));
+        return server;
+    }
+
+    public static void broadcastWebsockets(String websocketPath, String msg) {
+        Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
+        if (webSocketChannels != null) {
+            new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+        }
+    }
+
+    public static void broadcastWebsockets(String websocketPath, String msg, String channelAttributeKey,
+            Predicate<Object> channelAttributeValueTest) {
+        Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
+        if (webSocketChannels != null) {
+            new ArrayList<>(webSocketChannels).stream()
+                    .filter(webSocketChannel -> channelAttributeValueTest.test(webSocketChannel.getAttribute(channelAttributeKey)))
+                    .forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+        }
+    }
+
+    public static void broadcastSse(String path, String data) {
+        ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
+        if (serverSentEventHandler != null) {
+            serverSentEventHandler.getConnections()
+                    .forEach(serverSentEventConnection -> serverSentEventConnection.send(data));
+        }
+    }
+
+    public static void broadcastSse(String path, Consumer<ServerSentEventConnection> action) {
+        ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
+        if (serverSentEventHandler != null) {
+            serverSentEventHandler.getConnections()
+                    .forEach(action::accept);
+        }
     }
 
     private static void startServer(SpurOptions options) {
@@ -122,6 +199,16 @@ public class SpurServer {
                 .setHandler(getHandlers(options))
                 .build();
         server.start();
+    }
+
+    private static <T> SpurServer setPathHandler(HttpString method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
+        if (serverStarted.get()) {
+            throw new IllegalStateException(SERVER_ALREADY_STARTED);
+        }
+        endpointsMap.putIfAbsent(path, new HashMap<>());
+        endpointsMap.get(path)
+                .put(method, new Endpoint(method, path, reqRes, classType));
+        return server;
     }
 
     private static HttpHandler getHandlers(SpurOptions options) {
@@ -160,7 +247,7 @@ public class SpurServer {
         }
 
         return Handlers.predicate(exchange -> isValidCorsOrigin(options, getRequestHeader(exchange, Headers.ORIGIN)),
-                new CorsHandler(secureRedirectHandler, options), secureRedirectHandler);
+                new CorsHandler(secureRedirectHandler), secureRedirectHandler);
 
     }
 
@@ -255,80 +342,6 @@ public class SpurServer {
                 .substring(2);
     }
 
-    public static Undertow.Builder rawUndertowBuilder() {
-        if (serverStarted.get()) {
-            throw new IllegalStateException(SERVER_ALREADY_STARTED);
-        }
-        return builder;
-    }
-
-    public static SpurServer websocket(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
-        webSocketHandlerMap.put(pathPrefix, new WebSocketHandler(pathPrefix, webSocketOnConnect, webSocketOnMessage));
-        return server;
-    }
-
-    public static void broadcastWebsockets(String websocketPath, String msg) {
-        Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
-        if (webSocketChannels != null) {
-            new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
-        }
-    }
-
-    public static void broadcastWebsockets(String websocketPath, String msg, String channelAttributeKey,
-            Predicate<Object> channelAttributeValueTest) {
-        Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
-        if (webSocketChannels != null) {
-            new ArrayList<>(webSocketChannels).stream()
-                    .filter(webSocketChannel -> channelAttributeValueTest.test(webSocketChannel.getAttribute(channelAttributeKey)))
-                    .forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
-        }
-    }
-
-    public static SpurServer schedule(long intervalSeconds, Runnable runnable) {
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(runnable, 0, intervalSeconds, TimeUnit.SECONDS);
-        return server;
-    }
-
-    public static SpurServer sse(String path) {
-        sseHandlerMap.put(path, Handlers.serverSentEvents());
-        return server;
-    }
-
-    public static void broadcastSse(String path, String data) {
-        ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
-        if (serverSentEventHandler != null) {
-            serverSentEventHandler.getConnections()
-                    .forEach(serverSentEventConnection -> serverSentEventConnection.send(data));
-        }
-    }
-
-    public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
-        return setPathHandler(GET, path, reqRes, null);
-    }
-
-    public static <T> SpurServer put(String path, Class<T> bodyClass, BiConsumer<Req<T>, Res> reqRes) {
-        return setPathHandler(PUT, path, reqRes, bodyClass);
-    }
-
-    public static <T> SpurServer post(String path, Class<T> bodyClass, BiConsumer<Req<T>, Res> reqRes) {
-        return setPathHandler(POST, path, reqRes, bodyClass);
-    }
-
-    public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
-        return setPathHandler(DELETE, path, reqRes, null);
-    }
-
-    private static <T> SpurServer setPathHandler(HttpString method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
-        if (serverStarted.get()) {
-            throw new IllegalStateException(SERVER_ALREADY_STARTED);
-        }
-        endpointsMap.putIfAbsent(path, new HashMap<>());
-        endpointsMap.get(path)
-                .put(method, new Endpoint(method, path, reqRes, classType));
-        return server;
-    }
-
     @FunctionalInterface
     private interface AsyncHttpHandler extends HttpHandler {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
@@ -345,55 +358,5 @@ public class SpurServer {
         }
 
         void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;
-    }
-
-    private static class WebSocketHandler {
-        String path;
-        WebSocketOnConnect webSocketOnConnect;
-        WebSocketOnMessage webSocketOnMessage;
-
-        public WebSocketHandler(String path, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
-            this.path = path;
-            this.webSocketOnConnect = webSocketOnConnect;
-            this.webSocketOnMessage = webSocketOnMessage;
-        }
-
-        public String getPath() {
-            return path;
-        }
-
-        public WebSocketOnConnect getWebSocketOnConnect() {
-            return webSocketOnConnect;
-        }
-
-        public WebSocketOnMessage getWebSocketOnMessage() {
-            return webSocketOnMessage;
-        }
-    }
-
-    // https://github.com/undertow-io/undertow/blob/master/examples/src/main/java/io/undertow/examples/http2/Http2Server.java
-    private static class RedirectHttpsHandler implements HttpHandler {
-        @Override
-        public void handleRequest(HttpServerExchange exchange) throws Exception {
-            exchange.getResponseHeaders()
-                    .add(Headers.LOCATION,
-                            "https://" + exchange.getHostName() + ":" + (exchange.getHostPort() + 363) + exchange.getRelativePath());
-            exchange.setStatusCode(StatusCodes.TEMPORARY_REDIRECT);
-        }
-    }
-
-    private static class CorsHandler implements HttpHandler {
-        private HttpHandler next;
-
-        public CorsHandler(HttpHandler next, SpurOptions options) {
-            this.next = next;
-        }
-
-        @Override
-        public void handleRequest(HttpServerExchange exchange) throws Exception {
-            exchange.getResponseHeaders()
-                    .put(ACCESS_CONTROL_ALLOW_ORIGIN, getRequestHeader(exchange, Headers.ORIGIN));
-            this.next.handleRequest(exchange);
-        }
     }
 }

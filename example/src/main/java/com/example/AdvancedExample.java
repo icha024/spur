@@ -57,7 +57,7 @@ public class AdvancedExample {
 
         sse("/sse");
 
-        schedule(5, () -> broadcastSse("/sse", "Hello by SSE"));
+        schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Hello by SSE")));
 
         start(spurOptions.enableGzip(true)
                 .enableCorsHeaders("*")
