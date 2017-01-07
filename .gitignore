@@ -34,6 +34,3 @@ hs_err_pid*
 pom.xml.*
 release.properties
 
-/**/*.keystore
-/**/*.pem
-/**/*.truststore
