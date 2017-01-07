@@ -67,7 +67,8 @@ public class SpurServer {
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
     private static SpurOptions serverOptions;
-    private static Set<WebSocketChannel> webSocketChannels = null;
+//    private static Set<WebSocketChannel> webSocketChannels = null;
+    private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
     private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
 
     private SpurServer() {
@@ -173,9 +174,14 @@ public class SpurServer {
     private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
         // TODO: Add security/auth
         pathTemplateHandler.add(webSocketHandler.getPath(), Handlers.websocket((exchange, channel) -> {
-            if (webSocketChannels == null) {
-                webSocketChannels = channel.getPeerConnections();
+            if (webSocketChannelsMap.get(webSocketHandler.getPath()) == null) {
+                webSocketChannelsMap.put(webSocketHandler.getPath(), channel.getPeerConnections());
             }
+//            double randomKey = Math.random();
+//            LOGGER.info("Setting secret: " + randomKey);
+//            channel.setAttribute("myKey", "secret key: " + randomKey);
+//            broadcastToAllWebsockets("A new user connected!");
+
             WebSocketMessageSender sender = new WebSocketMessageSender(channel);
             webSocketHandler.getWebSocketOnConnect()
                     .onConnect(sender);
@@ -183,6 +189,7 @@ public class SpurServer {
                     .set(new AbstractReceiveListener() {
                         @Override
                         protected void onFullTextMessage(WebSocketChannel channel, BufferedTextMessage message) {
+//                            LOGGER.info("Key was: " + channel.getAttribute("myKey"));
                             webSocketHandler.getWebSocketOnMessage()
                                     .onMessage(message.getData(), sender);
                         }
@@ -276,8 +283,11 @@ public class SpurServer {
         return server;
     }
 
-    public static void broadcastToAllWebsockets(String msg) {
-        new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+    public static void broadcastWebsockets(String websocketPath, String msg) {
+        Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
+        if (webSocketChannels != null) {
+            new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+        }
     }
 
     public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
@@ -341,16 +351,24 @@ public class SpurServer {
             this.channel = channel;
         }
 
-        void send(String msg) {
+        public void send(String msg) {
             if (msg != null) {
                 WebSockets.sendText(msg, channel, null);
             }
         }
 
-        void send(ByteBuffer byteBuffer) {
+        public void send(ByteBuffer byteBuffer) {
             if (byteBuffer != null) {
                 WebSockets.sendBinary(byteBuffer, channel, null);
             }
+        }
+
+        public boolean setChannelAttribute(String key, Object value) {
+            return channel.setAttribute(key, value);
+        }
+
+        public Object getChannelAttribute(String key) {
+            return channel.getAttribute(key);
         }
     }
 
