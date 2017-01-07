@@ -9,6 +9,7 @@ import static com.clianz.spur.SpurServer.spurOptions;
 import static com.clianz.spur.SpurServer.start;
 import static com.clianz.spur.SpurServer.websocket;
 
+import java.util.Date;
 import java.util.logging.Logger;
 
 import com.example.models.Pet;
@@ -22,8 +23,11 @@ public class AdvancedExample {
         get("/hello", (req, res) -> res.send("Hello world!"));
 
         get("/", (req, res) -> {
-            LOGGER.info("Call GET on root");
-            res.send(new Pet("Johnny"));
+//            LOGGER.info("Call GET on root");
+            Pet johnny = new Pet("Johnny");
+            johnny.setBirthDate(new Date());
+            johnny.setType("Cat");
+            res.send(johnny);
         });
 
         put("/bb", String.class, (req, res) -> res.send(req.body()));

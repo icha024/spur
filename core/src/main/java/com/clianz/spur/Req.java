@@ -12,8 +12,8 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonParseException;
+import org.boon.json.JsonFactory;
+import org.boon.json.ObjectMapper;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
@@ -31,7 +31,7 @@ public class Req<T> {
         factory.close();
     }
 
-    private static Gson gson = new Gson();
+    private static ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
     private HttpServerExchange httpServerExchange;
     private T body;
 
@@ -72,8 +72,8 @@ public class Req<T> {
 
         T parsedType;
         try {
-            parsedType = gson.fromJson(str, bodyClassType);
-        } catch (JsonParseException jpe) {
+            parsedType = jsonMapper.readValue(str, bodyClassType);
+        } catch (Exception e) {
             exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.endExchange();
             return;
@@ -92,7 +92,7 @@ public class Req<T> {
         } else {
             exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.getResponseSender()
-                    .send(gson.toJson(new InvalidValues(constraintViolations.stream()
+                    .send(jsonMapper.toJson(new InvalidValues(constraintViolations.stream()
                             .map(violation -> violation.getPropertyPath()
                                     .toString())
                             .collect(Collectors.toList()))));

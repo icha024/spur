@@ -8,8 +8,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import com.google.gson.Gson;
-
+import org.boon.json.JsonFactory;
+import org.boon.json.ObjectMapper;
 import org.xnio.channels.StreamSinkChannel;
 
 import io.undertow.server.HttpServerExchange;
@@ -20,7 +20,7 @@ public class Res {
 
     private static final Logger LOGGER = Logger.getLogger(Res.class.getName());
     private static final String JSON_CONTENT_TYPE = "application/json";
-    private static Gson gson = new Gson();
+    private static ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
     private HttpServerExchange httpServerExchange;
 
     protected Res(HttpServerExchange httpServerExchange) {
@@ -83,7 +83,7 @@ public class Res {
         httpServerExchange.getResponseHeaders()
                 .put(Headers.CONTENT_TYPE, JSON_CONTENT_TYPE);
 
-        String jsonStr = gson.toJson(obj);
+        String jsonStr = jsonMapper.toJson(obj);
         ByteBuffer byteBuffer = ByteBuffer.wrap(jsonStr.getBytes(StandardCharsets.UTF_8));
         StreamSinkChannel responseChannel = httpServerExchange.getResponseChannel();
         int written;
