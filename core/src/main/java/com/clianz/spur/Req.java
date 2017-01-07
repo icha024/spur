@@ -5,6 +5,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.validation.Configuration;
 import javax.validation.ConstraintViolation;
@@ -14,6 +15,7 @@ import javax.validation.ValidatorFactory;
 
 import org.boon.json.JsonFactory;
 import org.boon.json.ObjectMapper;
+import org.hibernate.validator.internal.util.logging.Log;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
@@ -21,6 +23,7 @@ import io.undertow.util.StatusCodes;
 
 public class Req<T> {
 
+    private static final Logger LOGGER = Logger.getLogger(Req.class.getName());
     private static Validator validator;
 
     static {
@@ -55,7 +58,7 @@ public class Req<T> {
     }
 
     public T body() {
-        return body;
+        return this.body;
     }
 
     protected void parseBody(PostParseConsumer objectConsumer) {

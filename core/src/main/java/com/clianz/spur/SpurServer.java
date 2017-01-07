@@ -206,13 +206,13 @@ public class SpurServer {
             return;
         }
 
-        //        LOGGER.info("Found method: " + endpoint.getMethod());
         if (isValidCorsOrigin(options, requestOrigin)) {
             setCorsOriginHeader(exchange, requestOrigin);
         }
         Req req = new Req(exchange, endpoint.getBodyClassType());
         req.parseBody((newExchange, body) -> endpoint.getReqResBiConsumer()
-                .accept(new Req(newExchange, endpoint.getBodyClassType()), new Res(newExchange)));
+//                .accept(new Req(newExchange, endpoint.getBodyClassType()), new Res(newExchange)));
+                .accept(req, new Res(newExchange)));
     }
 
     private static String getRequestHeader(HttpServerExchange exchange, HttpString headerName) {

@@ -32,7 +32,11 @@ public class AdvancedExample {
 
         put("/bb", String.class, (req, res) -> res.send(req.body()));
 
-        post("/a", String.class, (req, res) -> res.send(req.body()));
+        post("/a", Pet.class, (req, res) -> {
+            Pet body = req.body();
+            LOGGER.info("Req body: " + body);
+            res.send(body);
+        });
 
         delete("/a", (req, res) -> res.send("something gone"));
 

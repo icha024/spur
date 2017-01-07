@@ -1,16 +1,28 @@
 package com.example.models;
 
 import java.util.Date;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
 
 public class Pet {
+
+    private String name;
+    private String type;
+    private Date birthDate;
+    @Min(1)
+    private int legs;
 
     public Pet(String name) {
         this.name = name;
     }
 
-    private String name;
-    private String type;
-    private Date birthDate;
+    public int getLegs() {
+        return legs;
+    }
+
+    public void setLegs(int legs) {
+        this.legs = legs;
+    }
 
     public String getName() {
         return name;
