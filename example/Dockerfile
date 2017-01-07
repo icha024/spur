@@ -1,4 +1,5 @@
 FROM java:8
-ADD gauth-totp-web.jar gauth-totp-web.jar
+ADD demo.jar demo.jar
 EXPOSE 8080
-ENTRYPOINT ["java","-DPORT=8080","-jar","gauth-totp-web.jar"]
+EXPOSE 8443
+ENTRYPOINT ["java","-DPORT=8080","-jar","demo.jar"]

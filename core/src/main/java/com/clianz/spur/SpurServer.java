@@ -15,14 +15,13 @@
  */
 package com.clianz.spur;
 
-import static com.clianz.spur.internal.HttpMethods.DELETE;
-import static com.clianz.spur.internal.HttpMethods.GET;
-import static com.clianz.spur.internal.HttpMethods.HEAD;
-import static com.clianz.spur.internal.HttpMethods.OPTIONS;
-import static com.clianz.spur.internal.HttpMethods.POST;
-import static com.clianz.spur.internal.HttpMethods.PUT;
+import static com.clianz.spur.helpers.HttpMethods.DELETE;
+import static com.clianz.spur.helpers.HttpMethods.GET;
+import static com.clianz.spur.helpers.HttpMethods.HEAD;
+import static com.clianz.spur.helpers.HttpMethods.OPTIONS;
+import static com.clianz.spur.helpers.HttpMethods.POST;
+import static com.clianz.spur.helpers.HttpMethods.PUT;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,7 +33,10 @@ import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
 
-import com.clianz.spur.internal.Endpoint;
+import com.clianz.spur.helpers.Endpoint;
+import com.clianz.spur.helpers.WebSocketMessageSender;
+import com.clianz.spur.helpers.WebSocketOnConnect;
+import com.clianz.spur.helpers.WebSocketOnMessage;
 
 import io.undertow.Handlers;
 import io.undertow.Undertow;
@@ -67,40 +69,12 @@ public class SpurServer {
     private static Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
-    private static SpurOptions serverOptions;
+    public static SpurOptions spurOptions = new SpurOptions();
     //    private static Set<WebSocketChannel> webSocketChannels = null;
     private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
     private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
 
     private SpurServer() {
-    }
-
-    public static void main(final String[] args) throws Exception {
-        get("/hello", (req, res) -> res.send("Hello world!"));
-
-        get("/", (req, res) -> {
-            LOGGER.info("Call GET on root");
-            res.send(new SpurOptions());
-        });
-
-        websocket("/myapp", sender -> {
-            LOGGER.info("A user has connected");
-            sender.send("Welcome!");
-        }, (msg, sender) -> {
-            sender.send("I got your message: " + msg);
-            LOGGER.info("User message received: " + msg);
-        });
-
-        post("/a", String.class, (req, res) -> res.send(req.body()));
-
-        delete("/a", (req, res) -> res.send("something gone"));
-
-        start(SpurOptions.enableGzip(true)
-                .enableCorsHeaders("*")
-                .enableBlockableHandlers(false)
-                .enableHttps(true)
-                .sslContext(null, null, "password")
-                .forceHttps(true));
     }
 
     public static void start() {
@@ -115,7 +89,7 @@ public class SpurServer {
         if (serverStarted.getAndSet(true)) {
             throw new IllegalStateException(SERVER_ALREADY_STARTED);
         }
-        SpurServer.serverOptions = options;
+        SpurServer.spurOptions = options;
 
         LOGGER.info("Listening to " + options.host + ":" + options.port);
 
@@ -339,7 +313,7 @@ public class SpurServer {
     private interface AsyncHttpHandler extends HttpHandler {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
             // non-blocking
-            if (serverOptions.blockableHandlersEnabled && exchange.isInIoThread()) {
+            if (spurOptions.blockableHandlersEnabled && exchange.isInIoThread()) {
                 LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
                 //                exchange.dispatch(ForkJoinPool.commonPool(), this);
                 exchange.dispatch(this);
@@ -351,44 +325,6 @@ public class SpurServer {
         }
 
         void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;
-    }
-
-    @FunctionalInterface
-    private interface WebSocketOnMessage {
-        void onMessage(String msg, WebSocketMessageSender sender);
-    }
-
-    @FunctionalInterface
-    private interface WebSocketOnConnect {
-        void onConnect(WebSocketMessageSender sender);
-    }
-
-    private static class WebSocketMessageSender {
-        WebSocketChannel channel;
-
-        public WebSocketMessageSender(WebSocketChannel channel) {
-            this.channel = channel;
-        }
-
-        public void send(String msg) {
-            if (msg != null) {
-                WebSockets.sendText(msg, channel, null);
-            }
-        }
-
-        public void send(ByteBuffer byteBuffer) {
-            if (byteBuffer != null) {
-                WebSockets.sendBinary(byteBuffer, channel, null);
-            }
-        }
-
-        public boolean setChannelAttribute(String key, Object value) {
-            return channel.setAttribute(key, value);
-        }
-
-        public Object getChannelAttribute(String key) {
-            return channel.getAttribute(key);
-        }
     }
 
     private static class WebSocketHandler {

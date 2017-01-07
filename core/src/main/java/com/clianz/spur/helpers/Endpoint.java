@@ -1,4 +1,4 @@
-package com.clianz.spur.internal;
+package com.clianz.spur.helpers;
 
 import java.util.Objects;
 import java.util.function.BiConsumer;

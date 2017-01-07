@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.clianz</groupId>
 	<artifactId>spur-parent</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.1.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>spur-framework</name>
 	<description>Spur framework</description>
@@ -13,7 +13,7 @@
 	</properties>
 	<modules>
 		<module>core</module>
-		<!--<module>example</module>-->
+		<module>example</module>
 	</modules>
 	<build>
 		<plugins>

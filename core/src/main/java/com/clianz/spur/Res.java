@@ -1,6 +1,6 @@
 package com.clianz.spur;
 
-import static com.clianz.spur.internal.HttpMethods.HEAD;
+import static com.clianz.spur.helpers.HttpMethods.HEAD;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
