@@ -14,6 +14,8 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
+
 public class SpurOptions {
 
     private static final Logger LOGGER = Logger.getLogger(SpurOptions.class.getName());
@@ -33,8 +35,14 @@ public class SpurOptions {
     protected String keystorePath = getEnvProperty("KEYSTORE", "");
     protected String truststorePath = getEnvProperty("TRUSTSTORE", "");
     protected String keystorePassword = getEnvProperty("KEYSTORE_PASSWORD", "password");
+    protected boolean forceHttps = getEnvProperty("FORCE_HTTPS", false);
 
     protected SpurOptions() {}
+
+    public static SpurOptions forceHttps(boolean forceHttps) {
+        option.forceHttps = forceHttps;
+        return option;
+    }
 
     public static SpurOptions enableCorsHeaders(String corsHeaders) {
         option.corsHeaders = parseCorsString(corsHeaders);

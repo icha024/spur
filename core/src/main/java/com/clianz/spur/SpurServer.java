@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
 
@@ -67,7 +68,7 @@ public class SpurServer {
     private static AtomicBoolean serverStarted = new AtomicBoolean(false);
     private static Undertow.Builder builder = Undertow.builder();
     private static SpurOptions serverOptions;
-//    private static Set<WebSocketChannel> webSocketChannels = null;
+    //    private static Set<WebSocketChannel> webSocketChannels = null;
     private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
     private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
 
@@ -98,7 +99,8 @@ public class SpurServer {
                 .enableCorsHeaders("*")
                 .enableBlockableHandlers(false)
                 .enableHttps(true)
-                .sslContext(null, null, "password"));
+                .sslContext(null, null, "password")
+                .forceHttps(true));
     }
 
     public static void start() {
@@ -168,7 +170,14 @@ public class SpurServer {
             gracefulShutdownHandler = Handlers.gracefulShutdown(pathTemplateHandler);
         }
 
-        return gracefulShutdownHandler;
+        HttpHandler secureRedirectHandler;
+        if (options.forceHttps) {
+            secureRedirectHandler = Handlers.predicate(Predicates.secure(), gracefulShutdownHandler, new RedirectHttpsHandler());
+        } else {
+            secureRedirectHandler = gracefulShutdownHandler;
+        }
+
+        return secureRedirectHandler;
     }
 
     private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
@@ -177,10 +186,10 @@ public class SpurServer {
             if (webSocketChannelsMap.get(webSocketHandler.getPath()) == null) {
                 webSocketChannelsMap.put(webSocketHandler.getPath(), channel.getPeerConnections());
             }
-//            double randomKey = Math.random();
-//            LOGGER.info("Setting secret: " + randomKey);
-//            channel.setAttribute("myKey", "secret key: " + randomKey);
-//            broadcastToAllWebsockets("A new user connected!");
+            //            double randomKey = Math.random();
+            //            LOGGER.info("Setting secret: " + randomKey);
+            //            channel.setAttribute("myKey", "secret key: " + randomKey);
+            //            broadcastToAllWebsockets("A new user connected!");
 
             WebSocketMessageSender sender = new WebSocketMessageSender(channel);
             webSocketHandler.getWebSocketOnConnect()
@@ -189,7 +198,7 @@ public class SpurServer {
                     .set(new AbstractReceiveListener() {
                         @Override
                         protected void onFullTextMessage(WebSocketChannel channel, BufferedTextMessage message) {
-//                            LOGGER.info("Key was: " + channel.getAttribute("myKey"));
+                            //                            LOGGER.info("Key was: " + channel.getAttribute("myKey"));
                             webSocketHandler.getWebSocketOnMessage()
                                     .onMessage(message.getData(), sender);
                         }
@@ -287,6 +296,16 @@ public class SpurServer {
         Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
         if (webSocketChannels != null) {
             new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
+        }
+    }
+
+    public static void broadcastWebsockets(String websocketPath, String msg, String channelAttributeKey,
+            Predicate<Object> channelAttributeValueTest) {
+        Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
+        if (webSocketChannels != null) {
+            new ArrayList<>(webSocketChannels).stream()
+                    .filter(webSocketChannel -> channelAttributeValueTest.test(webSocketChannel.getAttribute(channelAttributeKey)))
+                    .forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
         }
     }
 
@@ -397,7 +416,7 @@ public class SpurServer {
     }
 
     // https://github.com/undertow-io/undertow/blob/master/examples/src/main/java/io/undertow/examples/http2/Http2Server.java
-    private class ForceHttpsHandler implements HttpHandler {
+    private static class RedirectHttpsHandler implements HttpHandler {
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
             exchange.getResponseHeaders()
