@@ -25,39 +25,48 @@ public class AdvancedExample {
 
         get("/hello", (req, res) -> res.send("Hello world!"));
 
+        get("/someErrorPath", (req, res) -> res.status(500).header("TRACE-ID", "12345").send());
+
         get("/", (req, res) -> {
-//            LOGGER.info("Call GET on root");
-            Pet johnny = new Pet("Johnny");
+            //            LOGGER.info("A cat call Tom was born");
+            Pet johnny = new Pet("Tom");
             johnny.setBirthDate(new Date());
             johnny.setType("Cat");
             res.send(johnny);
         });
 
-        put("/bb", String.class, (req, res) -> res.send(req.body()));
+        put("/bb", String.class, (req, res) -> res.send("Reqeust body was String type: " + req.body()
+                .toUpperCase()));
 
         post("/a", Pet.class, (req, res) -> {
-            Pet body = req.body();
-            LOGGER.info("Req body: " + body);
-            res.send(body);
+            Pet pet = req.body();
+            LOGGER.info("Req pet parsed from JSON and validated with Bean Validator 1.1: " + pet.getName());
+            LOGGER.info("Sending out an object will have it converted to JSON.");
+            res.send(pet);
         });
 
         delete("/a", (req, res) -> res.send("something gone"));
 
+        schedule(60, () -> LOGGER.info("This is a runnable task that starts every 60 seconds"));
+
         websocket("/myapp", sender -> {
-            LOGGER.info("A user has connected");
+            LOGGER.info("[OnConnectEvent] A user has connected");
             sender.send("Welcome!");
         }, (msg, sender) -> {
-            LOGGER.info("User message received: " + msg);
-            sender.send("I got your message: " + msg);
+            LOGGER.info("[OnMessageEvent] User message received: " + msg);
+            sender.send("I heard you say: " + msg);
         });
 
+        broadcastWebsockets("/myapp", "Everyone connected to the websocket path /myapp will see this");
+
         broadcastWebsockets("/myapp",
-                "This message will broadcast to all websocket users on the path, if the value store for the key returns is true", "attrKey",
-                attrVal -> attrVal != null);
+                "This message will broadcast to websocket users on the path /myapp only if the predicate operator on the key's value is true",
+                "attrKey", attrVal -> attrVal != null);
 
         sse("/sse");
+        broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
 
-        schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Hello by SSE")));
+        schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
 
         start(spurOptions.enableGzip(true)
                 .enableCorsHeaders("*")

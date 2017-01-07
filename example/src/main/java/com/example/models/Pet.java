@@ -2,14 +2,14 @@ package com.example.models;
 
 import java.util.Date;
 import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
 
 public class Pet {
 
     private String name;
     private String type;
     private Date birthDate;
-    @Min(1)
+
+    @Min(1) // No snakes for pets here...
     private int legs;
 
     public Pet(String name) {

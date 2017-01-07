@@ -15,7 +15,6 @@ import javax.validation.ValidatorFactory;
 
 import org.boon.json.JsonFactory;
 import org.boon.json.ObjectMapper;
-import org.hibernate.validator.internal.util.logging.Log;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;

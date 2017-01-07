@@ -87,7 +87,7 @@ public class SpurServer {
     }
 
     public static void start() {
-        start(new SpurOptions());
+        start(spurOptions);
     }
 
     public static void start(SpurOptions options) {
@@ -254,9 +254,7 @@ public class SpurServer {
     private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
         // TODO: Add security/auth
         pathTemplateHandler.add(webSocketHandler.getPath(), Handlers.websocket((exchange, channel) -> {
-            if (webSocketChannelsMap.get(webSocketHandler.getPath()) == null) {
-                webSocketChannelsMap.put(webSocketHandler.getPath(), channel.getPeerConnections());
-            }
+            webSocketChannelsMap.putIfAbsent(webSocketHandler.getPath(), channel.getPeerConnections());
             //            double randomKey = Math.random();
             //            LOGGER.info("Setting secret: " + randomKey);
             //            channel.setAttribute("myKey", "secret key: " + randomKey);
@@ -347,8 +345,7 @@ public class SpurServer {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
             // non-blocking
             if (spurOptions.blockableHandlersEnabled && exchange.isInIoThread()) {
-                LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
-                //                exchange.dispatch(ForkJoinPool.commonPool(), this);
+//                LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
                 exchange.dispatch(this);
                 return;
             }
