@@ -23,11 +23,7 @@ import static com.clianz.spur.helpers.HttpMethods.PATCH;
 import static com.clianz.spur.helpers.HttpMethods.POST;
 import static com.clianz.spur.helpers.HttpMethods.PUT;
 
-import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +43,7 @@ import com.clianz.spur.helpers.BasicAuthHandler;
 import com.clianz.spur.helpers.CorsHandler;
 import com.clianz.spur.helpers.Endpoint;
 import com.clianz.spur.helpers.RedirectHttpsHandler;
+import com.clianz.spur.helpers.RequestFilter;
 import com.clianz.spur.helpers.WebSocketHandler;
 import com.clianz.spur.helpers.WebSocketMessageSender;
 import com.clianz.spur.helpers.WebSocketOnConnect;
@@ -56,20 +53,8 @@ import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.UndertowOptions;
 import io.undertow.predicate.Predicates;
-import io.undertow.security.api.AuthenticationMechanism;
-import io.undertow.security.api.AuthenticationMode;
-import io.undertow.security.handlers.AuthenticationCallHandler;
-import io.undertow.security.handlers.AuthenticationConstraintHandler;
-import io.undertow.security.handlers.AuthenticationMechanismsHandler;
-import io.undertow.security.handlers.SecurityInitialHandler;
-import io.undertow.security.idm.Account;
-import io.undertow.security.idm.Credential;
-import io.undertow.security.idm.IdentityManager;
-import io.undertow.security.idm.PasswordCredential;
-import io.undertow.security.impl.BasicAuthenticationMechanism;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
-import io.undertow.server.handlers.GracefulShutdownHandler;
 import io.undertow.server.handlers.PathTemplateHandler;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
@@ -100,6 +85,7 @@ public class SpurServer {
     private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
     private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
     private static Map<String, ServerSentEventHandler> sseHandlerMap = new HashMap<>();
+    private static List<RequestFilter> requestFilters = new ArrayList<>();
 
     private SpurServer() {
     }
@@ -137,6 +123,11 @@ public class SpurServer {
 
     public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(DELETE, path, reqRes, null);
+    }
+
+    public static SpurServer preFilterRequests(io.undertow.predicate.Predicate assertionPredicate, HttpHandler failureHandler) {
+        requestFilters.add(new RequestFilter(assertionPredicate, failureHandler));
+        return server;
     }
 
     public static SpurServer schedule(long intervalSeconds, Runnable runnable) {
@@ -234,11 +225,13 @@ public class SpurServer {
     }
 
     private static HttpHandler getHandlers(SpurOptions options) {
+        // Path handler
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
         endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
             invokePathTemplateHandler(options, methodEndpointMap, exchange);
         }));
 
+        // Websocket
         if (!webSocketHandlerMap.isEmpty()) {
             webSocketHandlerMap.forEach((pathPrefix, webSocketHandler) -> {
                 LOGGER.info("Adding WS for path: " + webSocketHandler.getPath());
@@ -246,42 +239,38 @@ public class SpurServer {
             });
         }
 
+        // SSE
         if (!sseHandlerMap.isEmpty()) {
             sseHandlerMap.forEach(pathTemplateHandler::add);
         }
 
+        // CORS
         HttpHandler httpHandler = Handlers.predicate(exchange -> isValidCorsOrigin(options, getRequestHeader(exchange, Headers.ORIGIN)),
                 new CorsHandler(pathTemplateHandler), pathTemplateHandler);
 
+        // Gzip
         if (options.gzipEnabled) {
-            httpHandler = new EncodingHandler(
-                    new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
-                            Predicates.maxContentSize(options.gzipMaxSize))).setNext(httpHandler);
+            httpHandler = new EncodingHandler(new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
+                    Predicates.maxContentSize(options.gzipMaxSize))).setNext(httpHandler);
         }
 
+        // Custom handlers
+        for (RequestFilter requestFilter : requestFilters) {
+            httpHandler = Handlers.predicate(requestFilter.getAssertionPredicate(), httpHandler, requestFilter.getFailureHandler());
+        }
+
+        // Graceful shutdown
         httpHandler = Handlers.gracefulShutdown(httpHandler);
 
+        // Basic auth
         if (!options.basicAuthUser.isEmpty() && !options.basicAuthPassword.isEmpty()) {
-            httpHandler = Handlers.predicate(exchange -> {
-                String auth = getRequestHeader(exchange, new HttpString("Authorization"));
-                if (auth == null) {
-                    return false;
-                } else if (auth.equals("BASIC " + Base64.getEncoder().encodeToString(options.basicAuthPassword.getBytes()))) {
-                    return true;
-                }
-                return false;
-            }, httpHandler, httpServerExchange -> httpServerExchange.setStatusCode(StatusCodes.FORBIDDEN).endExchange());
+            httpHandler = new BasicAuthHandler(httpHandler, options.basicAuthUser, options.basicAuthPassword);
         }
 
+        // Force HTTPS
         if (options.forceHttps) {
             httpHandler = Handlers.predicate(Predicates.secure(), httpHandler, new RedirectHttpsHandler());
         }
-
-
-//        if (!options.basicAuthUser.isEmpty() && !options.basicAuthPassword.isEmpty()) {
-//            LOGGER.info("Forcing basic auth...");
-//            return new BasicAuthHandler(corsHandler, options.basicAuthUser, options.basicAuthPassword);
-//        }
 
         return httpHandler;
     }

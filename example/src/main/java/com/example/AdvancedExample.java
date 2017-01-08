@@ -6,6 +6,7 @@ import static com.clianz.spur.SpurServer.delete;
 import static com.clianz.spur.SpurServer.get;
 import static com.clianz.spur.SpurServer.patch;
 import static com.clianz.spur.SpurServer.post;
+import static com.clianz.spur.SpurServer.preFilterRequests;
 import static com.clianz.spur.SpurServer.put;
 import static com.clianz.spur.SpurServer.schedule;
 import static com.clianz.spur.SpurServer.spurOptions;
@@ -17,6 +18,8 @@ import java.util.Date;
 import java.util.logging.Logger;
 
 import com.example.models.Pet;
+
+import io.undertow.util.StatusCodes;
 
 public class AdvancedExample {
 
@@ -73,6 +76,14 @@ public class AdvancedExample {
         broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
 
         schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
+
+        preFilterRequests(httpServerExchange -> httpServerExchange.getRequestHeaders()
+                .get("deny") == null, httpServerExchange -> httpServerExchange.setStatusCode(StatusCodes.REQUEST_ENTITY_TOO_LARGE)
+                .endExchange());
+
+//        preFilterRequests(httpServerExchange -> httpServerExchange.getRequestHeaders()
+//                .get("block") == null, httpServerExchange -> httpServerExchange.setStatusCode(StatusCodes.REQUEST_ENTITY_TOO_LARGE)
+//                .endExchange());
 
         start(spurOptions.enableGzip(true)
                 .enableCorsHeaders("*")
