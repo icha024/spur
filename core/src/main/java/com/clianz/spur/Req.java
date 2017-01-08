@@ -61,12 +61,16 @@ public class Req<T> {
     }
 
     protected void parseBody(PostParseConsumer objectConsumer) {
-        httpServerExchange.getRequestReceiver()
-                .receiveFullString((exchange, str) -> convertBodyStringToObj(objectConsumer, exchange, str), StandardCharsets.UTF_8);
+        if (bodyClassType == null || bodyClassType.equals(Void.class)) {
+            objectConsumer.postParse(httpServerExchange, null);
+        } else {
+            httpServerExchange.getRequestReceiver()
+                    .receiveFullString((exchange, str) -> convertBodyStringToObj(objectConsumer, exchange, str), StandardCharsets.UTF_8);
+        }
     }
 
     private void convertBodyStringToObj(PostParseConsumer objectConsumer, HttpServerExchange exchange, String str) {
-        if (bodyClassType == null || bodyClassType.equals(Void.class) || bodyClassType.equals(String.class)) {
+        if (bodyClassType.equals(String.class)) {
             this.body = (T) str;
             objectConsumer.postParse(exchange, str);
             return;

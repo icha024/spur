@@ -19,6 +19,7 @@ import static com.clianz.spur.helpers.HttpMethods.DELETE;
 import static com.clianz.spur.helpers.HttpMethods.GET;
 import static com.clianz.spur.helpers.HttpMethods.HEAD;
 import static com.clianz.spur.helpers.HttpMethods.OPTIONS;
+import static com.clianz.spur.helpers.HttpMethods.PATCH;
 import static com.clianz.spur.helpers.HttpMethods.POST;
 import static com.clianz.spur.helpers.HttpMethods.PUT;
 
@@ -111,6 +112,10 @@ public class SpurServer {
 
     public static <T> SpurServer post(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(POST, path, reqRes, requestBodyClass);
+    }
+
+    public static <T> SpurServer patch(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
+        return setPathHandler(PATCH, path, reqRes, requestBodyClass);
     }
 
     public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
@@ -345,7 +350,7 @@ public class SpurServer {
         default void handleRequest(HttpServerExchange exchange) throws Exception {
             // non-blocking
             if (spurOptions.blockableHandlersEnabled && exchange.isInIoThread()) {
-//                LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
+                //                LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
                 exchange.dispatch(this);
                 return;
             }

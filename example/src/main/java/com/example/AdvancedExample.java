@@ -4,6 +4,7 @@ import static com.clianz.spur.SpurServer.broadcastSse;
 import static com.clianz.spur.SpurServer.broadcastWebsockets;
 import static com.clianz.spur.SpurServer.delete;
 import static com.clianz.spur.SpurServer.get;
+import static com.clianz.spur.SpurServer.patch;
 import static com.clianz.spur.SpurServer.post;
 import static com.clianz.spur.SpurServer.put;
 import static com.clianz.spur.SpurServer.schedule;
@@ -25,22 +26,27 @@ public class AdvancedExample {
 
         get("/hello", (req, res) -> res.send("Hello world!"));
 
-        get("/someErrorPath", (req, res) -> res.status(500).header("TRACE-ID", "12345").send());
+        get("/someErrorPath", (req, res) -> res.status(500)
+                .header("TRACE-ID", "12345")
+                .send());
 
         get("/", (req, res) -> {
-            //            LOGGER.info("A cat call Tom was born");
+            // LOGGER.info("A cat call Tom was born");
             Pet johnny = new Pet("Tom");
             johnny.setBirthDate(new Date());
             johnny.setType("Cat");
             res.send(johnny);
         });
 
-        put("/bb", String.class, (req, res) -> res.send("Reqeust body was String type: " + req.body()
+        put("/bb", String.class, (req, res) -> res.send("Request body was String type: " + req.body()
                 .toUpperCase()));
+
+        patch("/bb", null, (req, res) -> res.send(
+                "Request body was not parsed: " + req.body() + ". Access/parse it manually with rawHttpServerExchange()"));
 
         post("/a", Pet.class, (req, res) -> {
             Pet pet = req.body();
-            LOGGER.info("Req pet parsed from JSON and validated with Bean Validator 1.1: " + pet.getName());
+            LOGGER.info("Req Pet type parsed from JSON, and validated with Bean Validator 1.1: " + pet.getName());
             LOGGER.info("Sending out an object will have it converted to JSON.");
             res.send(pet);
         });
@@ -73,6 +79,7 @@ public class AdvancedExample {
                 .enableBlockableHandlers(false)
                 .enableHttps(true)
                 .sslContext(null, null, "password")
+                .enableFileServer(true)
                 .forceHttps(true));
     }
 }
