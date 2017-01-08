@@ -56,14 +56,14 @@ public class AdvancedExample {
 
         delete("/a", (req, res) -> res.send("something gone"));
 
-        schedule(60, () -> LOGGER.info("This is a runnable task that starts every 60 seconds"));
+        schedule(60, () -> LOGGER.info("This is a runnable task that triggers every 60 seconds"));
 
-        websocket("/myapp", sender -> {
+        websocket("/myapp", res -> {
             LOGGER.info("[OnConnectEvent] A user has connected");
-            sender.send("Welcome!");
-        }, (msg, sender) -> {
+            res.send("Welcome!");
+        }, (msg, res) -> {
             LOGGER.info("[OnMessageEvent] User message received: " + msg);
-            sender.send("I heard you say: " + msg);
+            res.send("I heard you say: " + msg);
         });
 
         broadcastWebsockets("/myapp", "Everyone connected to the websocket path /myapp will see this");

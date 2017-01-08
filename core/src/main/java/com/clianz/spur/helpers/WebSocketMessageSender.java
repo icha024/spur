@@ -12,6 +12,10 @@ public class WebSocketMessageSender {
         this.channel = channel;
     }
 
+    public void send() {
+        // Just keeping API inline...
+    }
+
     public void send(String msg) {
         if (msg != null) {
             WebSockets.sendText(msg, channel, null);

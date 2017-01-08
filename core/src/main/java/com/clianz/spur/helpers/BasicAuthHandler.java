@@ -12,17 +12,17 @@ import io.undertow.util.StatusCodes;
 public class BasicAuthHandler implements HttpHandler {
     private static final Logger LOGGER = Logger.getLogger(BasicAuthHandler.class.getName());
     private HttpHandler authChecker;
+    private final String expectedCredential;
 
     public BasicAuthHandler(HttpHandler next, String expectedUsername, String expectedPassword) {
+        this.expectedCredential = "Basic " + Base64.getEncoder()
+                .encodeToString((expectedUsername + ":" + expectedPassword).getBytes());
         this.authChecker = Handlers.predicate(exchange -> {
-            String auth = getRequestHeader(exchange, new HttpString("Authorization"));
-            if (auth == null) {
+            String userCredential = getRequestHeader(exchange, new HttpString("Authorization"));
+            if (userCredential == null) {
                 return false;
-            } else {
-                if (auth.equals("Basic " + Base64.getEncoder()
-                        .encodeToString((expectedUsername + ":" + expectedPassword).getBytes()))) {
-                    return true;
-                }
+            } else if (expectedCredential.equals(userCredential)) {
+                return true;
             }
             return false;
         }, next, exchange -> {

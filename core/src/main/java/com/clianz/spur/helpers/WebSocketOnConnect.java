@@ -2,5 +2,5 @@ package com.clianz.spur.helpers;
 
 @FunctionalInterface
 public interface WebSocketOnConnect {
-    void onConnect(WebSocketMessageSender sender);
+    void onConnect(WebSocketMessageSender res);
 }
