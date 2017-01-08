@@ -125,8 +125,14 @@ public class SpurServer {
         return setPathHandler(DELETE, path, reqRes, null);
     }
 
-    public static SpurServer preFilterRequests(io.undertow.predicate.Predicate assertionPredicate, HttpHandler failureHandler) {
-        requestFilters.add(new RequestFilter(assertionPredicate, failureHandler));
+    //    public static SpurServer preFilterRequests(io.undertow.predicate.Predicate assertionPredicate, HttpHandler failureHandler) {
+    //        requestFilters.add(new RequestFilter(assertionPredicate, failureHandler));
+    //        return server;
+    //    }
+
+    public static SpurServer preFilterRequests(Predicate<Req> assertion, Consumer<Res> failureHandler) {
+        requestFilters.add(new RequestFilter(httpServerExchange -> assertion.test(new Req(httpServerExchange, null)),
+                httpServerExchange -> failureHandler.accept(new Res(httpServerExchange))));
         return server;
     }
 

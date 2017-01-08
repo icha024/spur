@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -52,8 +53,27 @@ public class Req<T> {
         return httpServerExchange.getQueryParameters();
     }
 
+    public Optional<String> param(String paramName) {
+        Deque<String> deque = httpServerExchange.getQueryParameters()
+                .get(paramName);
+        if (deque == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(deque.getFirst());
+    }
+
     public HeaderMap headers() {
         return httpServerExchange.getRequestHeaders();
+    }
+
+    public Optional<String> header(String headerName) {
+        return Optional.ofNullable(httpServerExchange.getRequestHeaders()
+                .getFirst(headerName));
+    }
+
+    public String method() {
+        return httpServerExchange.getRequestMethod()
+                .toString();
     }
 
     public T body() {

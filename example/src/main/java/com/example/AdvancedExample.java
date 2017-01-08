@@ -77,13 +77,8 @@ public class AdvancedExample {
 
         schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
 
-        preFilterRequests(httpServerExchange -> httpServerExchange.getRequestHeaders()
-                .get("deny") == null, httpServerExchange -> httpServerExchange.setStatusCode(StatusCodes.REQUEST_ENTITY_TOO_LARGE)
-                .endExchange());
-
-//        preFilterRequests(httpServerExchange -> httpServerExchange.getRequestHeaders()
-//                .get("block") == null, httpServerExchange -> httpServerExchange.setStatusCode(StatusCodes.REQUEST_ENTITY_TOO_LARGE)
-//                .endExchange());
+        preFilterRequests(req -> !req.header("deny").isPresent(), res -> res.status(StatusCodes.FORBIDDEN).send());
+        preFilterRequests(req -> !req.header("block").isPresent(), res -> res.status(StatusCodes.FORBIDDEN).send());
 
         start(spurOptions.enableGzip(true)
                 .enableCorsHeaders("*")
