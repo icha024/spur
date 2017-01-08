@@ -34,7 +34,8 @@ public class SpurOptions {
     protected String truststorePath = getEnvProperty("TRUSTSTORE", "");
     protected String keystorePassword = getEnvProperty("KEYSTORE_PASSWORD", "password");
     protected boolean forceHttps = getEnvProperty("FORCE_HTTPS", false);
-    protected boolean fileServerEnabled = getEnvProperty("ENABLE_FILE_SERVER", false);
+    protected String basicAuthUser = getEnvProperty("BASIC_AUTH_USER", "");
+    protected String basicAuthPassword = getEnvProperty("BASIC_AUTH_PASS", "");
 
     protected SpurOptions() {
     }
@@ -65,8 +66,9 @@ public class SpurOptions {
         return option;
     }
 
-    public SpurOptions enableFileServer(boolean gzipEnabled) {
-        option.fileServerEnabled = fileServerEnabled;
+    public SpurOptions enableBasicAuth(String user, String pass) {
+        option.basicAuthUser = user;
+        option.basicAuthPassword = pass;
         return option;
     }
 

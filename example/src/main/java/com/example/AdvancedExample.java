@@ -79,7 +79,7 @@ public class AdvancedExample {
                 .enableBlockableHandlers(false)
                 .enableHttps(true)
                 .sslContext(null, null, "password")
-                .enableFileServer(true)
+                .enableBasicAuth("admin", "pass")
                 .forceHttps(true));
     }
 }

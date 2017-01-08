@@ -23,8 +23,13 @@ import static com.clianz.spur.helpers.HttpMethods.PATCH;
 import static com.clianz.spur.helpers.HttpMethods.POST;
 import static com.clianz.spur.helpers.HttpMethods.PUT;
 
+import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -38,6 +43,7 @@ import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
 
+import com.clianz.spur.helpers.BasicAuthHandler;
 import com.clianz.spur.helpers.CorsHandler;
 import com.clianz.spur.helpers.Endpoint;
 import com.clianz.spur.helpers.RedirectHttpsHandler;
@@ -50,6 +56,17 @@ import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.UndertowOptions;
 import io.undertow.predicate.Predicates;
+import io.undertow.security.api.AuthenticationMechanism;
+import io.undertow.security.api.AuthenticationMode;
+import io.undertow.security.handlers.AuthenticationCallHandler;
+import io.undertow.security.handlers.AuthenticationConstraintHandler;
+import io.undertow.security.handlers.AuthenticationMechanismsHandler;
+import io.undertow.security.handlers.SecurityInitialHandler;
+import io.undertow.security.idm.Account;
+import io.undertow.security.idm.Credential;
+import io.undertow.security.idm.IdentityManager;
+import io.undertow.security.idm.PasswordCredential;
+import io.undertow.security.impl.BasicAuthenticationMechanism;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.GracefulShutdownHandler;
@@ -233,27 +250,40 @@ public class SpurServer {
             sseHandlerMap.forEach(pathTemplateHandler::add);
         }
 
-        EncodingHandler gzipEncodingHandler = new EncodingHandler(
-                new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
-                        Predicates.maxContentSize(options.gzipMaxSize))).setNext(pathTemplateHandler);
+        HttpHandler httpHandler = Handlers.predicate(exchange -> isValidCorsOrigin(options, getRequestHeader(exchange, Headers.ORIGIN)),
+                new CorsHandler(pathTemplateHandler), pathTemplateHandler);
 
-        GracefulShutdownHandler gracefulShutdownHandler;
         if (options.gzipEnabled) {
-            gracefulShutdownHandler = Handlers.gracefulShutdown(gzipEncodingHandler);
-        } else {
-            gracefulShutdownHandler = Handlers.gracefulShutdown(pathTemplateHandler);
+            httpHandler = new EncodingHandler(
+                    new ContentEncodingRepository().addEncodingHandler("gzip", new GzipEncodingProvider(), 50,
+                            Predicates.maxContentSize(options.gzipMaxSize))).setNext(httpHandler);
         }
 
-        HttpHandler secureRedirectHandler;
+        httpHandler = Handlers.gracefulShutdown(httpHandler);
+
+        if (!options.basicAuthUser.isEmpty() && !options.basicAuthPassword.isEmpty()) {
+            httpHandler = Handlers.predicate(exchange -> {
+                String auth = getRequestHeader(exchange, new HttpString("Authorization"));
+                if (auth == null) {
+                    return false;
+                } else if (auth.equals("BASIC " + Base64.getEncoder().encodeToString(options.basicAuthPassword.getBytes()))) {
+                    return true;
+                }
+                return false;
+            }, httpHandler, httpServerExchange -> httpServerExchange.setStatusCode(StatusCodes.FORBIDDEN).endExchange());
+        }
+
         if (options.forceHttps) {
-            secureRedirectHandler = Handlers.predicate(Predicates.secure(), gracefulShutdownHandler, new RedirectHttpsHandler());
-        } else {
-            secureRedirectHandler = gracefulShutdownHandler;
+            httpHandler = Handlers.predicate(Predicates.secure(), httpHandler, new RedirectHttpsHandler());
         }
 
-        return Handlers.predicate(exchange -> isValidCorsOrigin(options, getRequestHeader(exchange, Headers.ORIGIN)),
-                new CorsHandler(secureRedirectHandler), secureRedirectHandler);
 
+//        if (!options.basicAuthUser.isEmpty() && !options.basicAuthPassword.isEmpty()) {
+//            LOGGER.info("Forcing basic auth...");
+//            return new BasicAuthHandler(corsHandler, options.basicAuthUser, options.basicAuthPassword);
+//        }
+
+        return httpHandler;
     }
 
     private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
@@ -361,4 +391,5 @@ public class SpurServer {
 
         void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;
     }
+
 }
