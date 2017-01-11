@@ -15,21 +15,23 @@ import static com.clianz.spur.SpurServer.start;
 import static com.clianz.spur.SpurServer.websocket;
 
 import java.util.Date;
-import java.util.logging.Logger;
 
 import com.example.models.Pet;
+
+import org.jboss.logging.Logger;
 
 import io.undertow.util.StatusCodes;
 
 public class AdvancedExample {
 
+    //    private static final Logger LOGGER = Logger.getLogger(AdvancedExample.class.getName());
     private static final Logger LOGGER = Logger.getLogger(AdvancedExample.class.getName());
 
     public static void main(final String[] args) throws Exception {
 
         get("/hello", (req, res) -> res.send("Hello world!"));
 
-        get("/someErrorPath", (req, res) -> res.status(500)
+        get("/someErrorPath", (req, res) -> res.status(StatusCodes.INTERNAL_SERVER_ERROR)
                 .header("TRACE-ID", "12345")
                 .send());
 
@@ -77,8 +79,12 @@ public class AdvancedExample {
 
         schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
 
-        preFilterRequests(req -> !req.header("deny").isPresent(), res -> res.status(StatusCodes.FORBIDDEN).send());
-        preFilterRequests(req -> !req.header("block").isPresent(), res -> res.status(StatusCodes.FORBIDDEN).send());
+        preFilterRequests(req -> !req.header("deny")
+                .isPresent(), res -> res.status(StatusCodes.FORBIDDEN)
+                .send());
+        preFilterRequests(req -> !req.header("block")
+                .isPresent(), res -> res.status(StatusCodes.FORBIDDEN)
+                .send());
 
         start(spurOptions.enableGzip(true)
                 .enableCorsHeaders("*")

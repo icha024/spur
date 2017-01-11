@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
 
 import com.clianz.spur.helpers.BasicAuthHandler;
@@ -48,6 +47,8 @@ import com.clianz.spur.helpers.WebSocketHandler;
 import com.clianz.spur.helpers.WebSocketMessageSender;
 import com.clianz.spur.helpers.WebSocketOnConnect;
 import com.clianz.spur.helpers.WebSocketOnMessage;
+
+import org.jboss.logging.Logger;
 
 import io.undertow.Handlers;
 import io.undertow.Undertow;
@@ -193,7 +194,8 @@ public class SpurServer {
             try {
                 sslContext = options.getSslContext();
             } catch (Exception e) {
-                LOGGER.throwing("SpurOptions", "SpurOptions", e);
+                LOGGER.error("Can not create SSL context from properties: KEYSTORE=" + options.keystorePath + " TRUSTSTORE="
+                        + options.truststorePath, e);
                 throw new RuntimeException("Can not create SSL context from properties: KEYSTORE=" + options.keystorePath + " TRUSTSTORE="
                         + options.truststorePath);
             }

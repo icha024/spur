@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.validation.Configuration;
 import javax.validation.ConstraintViolation;
@@ -16,6 +15,7 @@ import javax.validation.ValidatorFactory;
 
 import org.boon.json.JsonFactory;
 import org.boon.json.ObjectMapper;
+import org.jboss.logging.Logger;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;

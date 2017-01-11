@@ -6,10 +6,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.boon.json.JsonFactory;
 import org.boon.json.ObjectMapper;
+import org.jboss.logging.Logger;
 import org.xnio.channels.StreamSinkChannel;
 
 import io.undertow.server.HttpServerExchange;
@@ -92,8 +92,7 @@ public class Res {
                 written = responseChannel.write(byteBuffer);
             } while (byteBuffer.hasRemaining() && written > 0);
         } catch (IOException e) {
-            LOGGER.severe("Can not write response: " + e.getMessage());
-            LOGGER.throwing("Res", "send(Object)", e);
+            LOGGER.error("Can not write response: " + e.getMessage(), e);
         }
     }
 }
