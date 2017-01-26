@@ -34,7 +34,7 @@ public class Req<T> {
         factory.close();
     }
 
-    private static ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
+    private ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
     private HttpServerExchange httpServerExchange;
     private T body;
 

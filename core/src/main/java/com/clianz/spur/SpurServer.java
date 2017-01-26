@@ -73,89 +73,104 @@ import io.undertow.websockets.core.WebSockets;
 public class SpurServer {
 
     private static final Logger LOGGER = Logger.getLogger(SpurServer.class.getName());
-    private static final String SERVER_ALREADY_STARTED = "Server already started.";
+    private static final String SERVER_ALREADY_DEFINED = "Server already defined.";
     private static final HttpString ACCESS_CONTROL_REQUEST_METHOD = new HttpString("Access-Control-Request-Method");
     private static final HttpString ACCESS_CONTROL_ALLOW_METHOD = new HttpString("Access-Control-Allow-Methods");
-    private static Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
 
-    private static final SpurServer server = new SpurServer();
-    public static SpurOptions spurOptions = new SpurOptions();
+    private Undertow server = null;
+    private Boolean serverLock = true;
+    private AtomicBoolean serviceDefined = new AtomicBoolean(false);
 
-    private static AtomicBoolean serverStarted = new AtomicBoolean(false);
-    private static Undertow.Builder builder = Undertow.builder();
-    private static Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
-    private static Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
-    private static Map<String, ServerSentEventHandler> sseHandlerMap = new HashMap<>();
-    private static List<RequestFilter> requestFilters = new ArrayList<>();
+    private Map<String, Map<HttpString, Endpoint>> endpointsMap = new HashMap<>();
+    private Map<String, Set<WebSocketChannel>> webSocketChannelsMap = new HashMap<>();
+    private Map<String, WebSocketHandler> webSocketHandlerMap = new HashMap<>();
+    private Map<String, ServerSentEventHandler> sseHandlerMap = new HashMap<>();
+    private List<RequestFilter> requestFilters = new ArrayList<>();
 
-    private SpurServer() {
+    public void start() {
+        startServer(Undertow.builder(), new SpurOptions());
     }
 
-    public static void start() {
-        start(spurOptions);
+    public void start(SpurOptions options) {
+        startServer(Undertow.builder(), options);
     }
 
-    public static void start(SpurOptions options) {
-        startServer(options);
+    public void start(SpurOptions options, Undertow.Builder builder) {
+        startServer(builder, options);
     }
 
-    public static Undertow.Builder rawUndertowBuilder() {
-        if (serverStarted.get()) {
-            throw new IllegalStateException(SERVER_ALREADY_STARTED);
+    public void stop() {
+        synchronized (serverLock) {
+            if (server != null) {
+                server.stop();
+                LOGGER.info("Server stopped.");
+            } else {
+                throw new IllegalStateException("Server did not exist.");
+            }
         }
-        return builder;
     }
 
-    public static <T> SpurServer get(String path, BiConsumer<Req<T>, Res> reqRes) {
+    public void resume() {
+        synchronized (serverLock) {
+            if (server != null) {
+                server.start();
+                LOGGER.info("Server resumed.");
+            } else {
+                throw new IllegalStateException("Server did not exist.");
+            }
+        }
+    }
+
+    public SpurServer get(String path, BiConsumer<Req<Void>, Res> reqRes) {
         return setPathHandler(GET, path, reqRes, null);
     }
 
-    public static <T> SpurServer put(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
+    public <T> SpurServer put(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(PUT, path, reqRes, requestBodyClass);
     }
 
-    public static <T> SpurServer post(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
+    public <T> SpurServer post(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(POST, path, reqRes, requestBodyClass);
     }
 
-    public static <T> SpurServer patch(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
+    public <T> SpurServer patch(String path, Class<T> requestBodyClass, BiConsumer<Req<T>, Res> reqRes) {
         return setPathHandler(PATCH, path, reqRes, requestBodyClass);
     }
 
-    public static <T> SpurServer delete(String path, BiConsumer<Req<T>, Res> reqRes) {
+    public SpurServer delete(String path, BiConsumer<Req<Void>, Res> reqRes) {
         return setPathHandler(DELETE, path, reqRes, null);
     }
 
-    public static SpurServer preFilterRequests(Predicate<Req> assertion, Consumer<Res> failureHandler) {
+    public SpurServer preFilterRequests(Predicate<Req> assertion, Consumer<Res> failureHandler) {
         requestFilters.add(new RequestFilter(httpServerExchange -> assertion.test(new Req(httpServerExchange, null)),
                 httpServerExchange -> failureHandler.accept(new Res(httpServerExchange))));
-        return server;
+        return this;
     }
 
-    public static SpurServer schedule(long intervalSeconds, Runnable runnable) {
+    public SpurServer schedule(long intervalSeconds, Runnable runnable) {
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(runnable, 0, intervalSeconds, TimeUnit.SECONDS);
-        return server;
+        return this;
     }
 
-    public static SpurServer sse(String path) {
+    public SpurServer sse(String path) {
         sseHandlerMap.put(path, Handlers.serverSentEvents());
-        return server;
+        return this;
     }
 
-    public static SpurServer websocket(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
+    public SpurServer websocket(String pathPrefix, WebSocketOnConnect webSocketOnConnect, WebSocketOnMessage webSocketOnMessage) {
         webSocketHandlerMap.put(pathPrefix, new WebSocketHandler(pathPrefix, webSocketOnConnect, webSocketOnMessage));
-        return server;
+        return this;
     }
 
-    public static void broadcastWebsockets(String websocketPath, String msg) {
+    public void broadcastWebsockets(String websocketPath, String msg) {
         Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
         if (webSocketChannels != null) {
             new ArrayList<>(webSocketChannels).forEach(webSocketChannel -> WebSockets.sendText(msg, webSocketChannel, null));
         }
     }
 
-    public static void broadcastWebsockets(String websocketPath, String msg, String channelAttributeKey,
+    public void broadcastWebsockets(String websocketPath, String msg, String channelAttributeKey,
             Predicate<Object> channelAttributeValueTest) {
         Set<WebSocketChannel> webSocketChannels = webSocketChannelsMap.get(websocketPath);
         if (webSocketChannels != null) {
@@ -165,7 +180,7 @@ public class SpurServer {
         }
     }
 
-    public static void broadcastSse(String path, String data) {
+    public void broadcastSse(String path, String data) {
         ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
         if (serverSentEventHandler != null) {
             serverSentEventHandler.getConnections()
@@ -173,7 +188,7 @@ public class SpurServer {
         }
     }
 
-    public static void broadcastSse(String path, Consumer<ServerSentEventConnection> action) {
+    public void broadcastSse(String path, Consumer<ServerSentEventConnection> action) {
         ServerSentEventHandler serverSentEventHandler = sseHandlerMap.get(path);
         if (serverSentEventHandler != null) {
             serverSentEventHandler.getConnections()
@@ -181,11 +196,10 @@ public class SpurServer {
         }
     }
 
-    private static void startServer(SpurOptions options) {
-        if (serverStarted.getAndSet(true)) {
-            throw new IllegalStateException(SERVER_ALREADY_STARTED);
+    private void startServer(Undertow.Builder builder, SpurOptions options) {
+        if (serviceDefined.getAndSet(true)) {
+            throw new IllegalStateException(SERVER_ALREADY_DEFINED);
         }
-        SpurServer.spurOptions = options;
 
         LOGGER.info("Listening to " + options.host + ":" + options.port);
 
@@ -207,31 +221,43 @@ public class SpurServer {
             builder = builder.addHttpsListener(options.httpsPort, options.host, sslContext);
             LOGGER.info("HTTPS Enabled");
         }
+        synchronized (serverLock) {
+            server = builder.addHttpListener(options.port, options.host)
+                    .setServerOption(UndertowOptions.REQUEST_PARSE_TIMEOUT, options.requestParseTimeOut)
+                    .setServerOption(UndertowOptions.ENABLE_HTTP2, options.http2Enabled)
+                    .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, options.maxEntitySize)
+                    .setHandler(getHandlers(options))
+                    .build();
+            server.start();
+        }
 
-        Undertow server = builder.addHttpListener(options.port, options.host)
-                .setServerOption(UndertowOptions.REQUEST_PARSE_TIMEOUT, options.requestParseTimeOut)
-                .setServerOption(UndertowOptions.ENABLE_HTTP2, options.http2Enabled)
-                .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, options.maxEntitySize)
-                .setHandler(getHandlers(options))
-                .build();
-        server.start();
     }
 
-    private static <T> SpurServer setPathHandler(HttpString method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
-        if (serverStarted.get()) {
-            throw new IllegalStateException(SERVER_ALREADY_STARTED);
+    private <T> SpurServer setPathHandler(HttpString method, String path, BiConsumer<Req<T>, Res> reqRes, Class<T> classType) {
+        if (serviceDefined.get()) {
+            throw new IllegalStateException(SERVER_ALREADY_DEFINED);
         }
         endpointsMap.putIfAbsent(path, new HashMap<>());
         endpointsMap.get(path)
                 .put(method, new Endpoint(method, path, reqRes, classType));
-        return server;
+        return this;
     }
 
-    private static HttpHandler getHandlers(SpurOptions options) {
+    private HttpHandler getHandlers(SpurOptions options) {
         // Path handler
         PathTemplateHandler pathTemplateHandler = Handlers.pathTemplate();
-        endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, (AsyncHttpHandler) exchange -> {
-            invokePathTemplateHandler(options, methodEndpointMap, exchange);
+        endpointsMap.forEach((path, methodEndpointMap) -> pathTemplateHandler.add(path, new HttpHandler() {
+            public void handleRequest(HttpServerExchange exchange) throws Exception {
+                // non-blocking
+                if (options.blockableHandlersEnabled && exchange.isInIoThread()) {
+                    // LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
+                    exchange.dispatch(this);
+                    return;
+                }
+                // handler code
+                // LOGGER.info("STARTING Async");
+                invokePathTemplateHandler(options, methodEndpointMap, exchange);
+            }
         }));
 
         // Websocket
@@ -278,7 +304,7 @@ public class SpurServer {
         return httpHandler;
     }
 
-    private static void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
+    private void addWebSocketHandler(PathTemplateHandler pathTemplateHandler, WebSocketHandler webSocketHandler) {
         // TODO: Add security/auth
         pathTemplateHandler.add(webSocketHandler.getPath(), Handlers.websocket((exchange, channel) -> {
             webSocketChannelsMap.putIfAbsent(webSocketHandler.getPath(), channel.getPeerConnections());
@@ -303,8 +329,7 @@ public class SpurServer {
         }));
     }
 
-    private static void invokePathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap,
-            HttpServerExchange exchange) {
+    private void invokePathTemplateHandler(SpurOptions options, Map<HttpString, Endpoint> methodEndpointsMap, HttpServerExchange exchange) {
 
         HttpString requestMethod = exchange.getRequestMethod();
         String requestAccessControlRequestMethod = getRequestHeader(exchange, ACCESS_CONTROL_REQUEST_METHOD);
@@ -332,7 +357,7 @@ public class SpurServer {
                 .accept(req, new Res(newExchange)));
     }
 
-    private static String getRequestHeader(HttpServerExchange exchange, HttpString headerName) {
+    private String getRequestHeader(HttpServerExchange exchange, HttpString headerName) {
         if (exchange.getRequestHeaders()
                 .contains(headerName)) {
             return exchange.getRequestHeaders()
@@ -342,16 +367,16 @@ public class SpurServer {
         return null;
     }
 
-    private static boolean isValidCorsOrigin(SpurOptions options, String requestOrigin) {
+    private boolean isValidCorsOrigin(SpurOptions options, String requestOrigin) {
         return options.corsHeaders.contains("*") || options.corsHeaders.contains(requestOrigin);
     }
 
-    private static void setCorsMethodHeader(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange) {
+    private void setCorsMethodHeader(SpurOptions options, Map<HttpString, Endpoint> methodEndpointMap, HttpServerExchange exchange) {
         exchange.getResponseHeaders()
                 .put(ACCESS_CONTROL_ALLOW_METHOD, getAllowedMethods(methodEndpointMap, options));
     }
 
-    private static String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap, SpurOptions options) {
+    private String getAllowedMethods(Map<HttpString, Endpoint> methodEndpointMap, SpurOptions options) {
         StringBuilder methodsAllowed = new StringBuilder();
         Set<HttpString> methodsDefined = new TreeSet<>(methodEndpointMap.keySet());
         if (methodsDefined.contains(GET)) {
@@ -364,23 +389,6 @@ public class SpurServer {
         methodsDefined.forEach(httpString -> methodsAllowed.append(", " + httpString));
         return methodsAllowed.toString()
                 .substring(2);
-    }
-
-    @FunctionalInterface
-    private interface AsyncHttpHandler extends HttpHandler {
-        default void handleRequest(HttpServerExchange exchange) throws Exception {
-            // non-blocking
-            if (spurOptions.blockableHandlersEnabled && exchange.isInIoThread()) {
-                //                LOGGER.info("Is in IO thread, dispatching for blockableHandlersEnabled...");
-                exchange.dispatch(this);
-                return;
-            }
-            // handler code
-            // LOGGER.info("STARTING Async");
-            asyncBlockingHandler(exchange);
-        }
-
-        void asyncBlockingHandler(HttpServerExchange exchange) throws Exception;
     }
 
 }

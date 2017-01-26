@@ -20,7 +20,7 @@ public class Res {
 
     private static final Logger LOGGER = Logger.getLogger(Res.class.getName());
     private static final String JSON_CONTENT_TYPE = "application/json";
-    private static ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
+    private ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
     private HttpServerExchange httpServerExchange;
 
     protected Res(HttpServerExchange httpServerExchange) {

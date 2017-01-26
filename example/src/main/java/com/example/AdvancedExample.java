@@ -1,18 +1,7 @@
 package com.example;
 
-import static com.clianz.spur.SpurServer.broadcastSse;
-import static com.clianz.spur.SpurServer.broadcastWebsockets;
-import static com.clianz.spur.SpurServer.delete;
-import static com.clianz.spur.SpurServer.get;
-import static com.clianz.spur.SpurServer.patch;
-import static com.clianz.spur.SpurServer.post;
-import static com.clianz.spur.SpurServer.preFilterRequests;
-import static com.clianz.spur.SpurServer.put;
-import static com.clianz.spur.SpurServer.schedule;
-import static com.clianz.spur.SpurServer.spurOptions;
-import static com.clianz.spur.SpurServer.sse;
-import static com.clianz.spur.SpurServer.start;
-import static com.clianz.spur.SpurServer.websocket;
+import com.clianz.spur.SpurOptions;
+import com.clianz.spur.SpurServer;
 
 import java.util.Date;
 
@@ -29,13 +18,15 @@ public class AdvancedExample {
 
     public static void main(final String[] args) throws Exception {
 
-        get("/hello", (req, res) -> res.send("Hello world!"));
+        SpurServer server = new SpurServer();
 
-        get("/someErrorPath", (req, res) -> res.status(StatusCodes.INTERNAL_SERVER_ERROR)
+        server.get("/hello", (req, res) -> res.send("Hello world!"));
+
+        server.get("/someErrorPath", (req, res) -> res.status(StatusCodes.INTERNAL_SERVER_ERROR)
                 .header("TRACE-ID", "12345")
                 .send());
 
-        get("/", (req, res) -> {
+        server.get("/", (req, res) -> {
             // LOGGER.info("A cat call Tom was born");
             Pet johnny = new Pet("Tom");
             johnny.setBirthDate(new Date());
@@ -43,24 +34,24 @@ public class AdvancedExample {
             res.send(johnny);
         });
 
-        put("/bb", String.class, (req, res) -> res.send("Request body was String type: " + req.body()
+        server.put("/bb", String.class, (req, res) -> res.send("Request body was String type: " + req.body()
                 .toUpperCase()));
 
-        patch("/bb", null, (req, res) -> res.send(
+        server.patch("/bb", null, (req, res) -> res.send(
                 "Request body was not parsed: " + req.body() + ". Access/parse it manually with rawHttpServerExchange()"));
 
-        post("/a", Pet.class, (req, res) -> {
+        server.post("/a", Pet.class, (req, res) -> {
             Pet pet = req.body();
             LOGGER.info("Req Pet type parsed from JSON, and validated with Bean Validator 1.1: " + pet.getName());
             LOGGER.info("Sending out an object will have it converted to JSON.");
             res.send(pet);
         });
 
-        delete("/a", (req, res) -> res.send("something gone"));
+        server.delete("/a", (req, res) -> res.send("something gone"));
 
-        schedule(60, () -> LOGGER.info("This is a runnable task that triggers every 60 seconds"));
+        server.schedule(60, () -> LOGGER.info("This is a runnable task that triggers every 60 seconds"));
 
-        websocket("/myapp", res -> {
+        server.websocket("/myapp", res -> {
             LOGGER.info("[OnConnectEvent] A user has connected");
             res.send("Welcome!");
         }, (msg, res) -> {
@@ -68,25 +59,25 @@ public class AdvancedExample {
             res.send("I heard you say: " + msg);
         });
 
-        broadcastWebsockets("/myapp", "Everyone connected to the websocket path /myapp will see this");
+        server.broadcastWebsockets("/myapp", "Everyone connected to the websocket path /myapp will see this");
 
-        broadcastWebsockets("/myapp",
+        server.broadcastWebsockets("/myapp",
                 "This message will broadcast to websocket users on the path /myapp only if the predicate operator on the key's value is true",
                 "attrKey", attrVal -> attrVal != null);
 
-        sse("/sse");
-        broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
+        server.sse("/sse");
+        server.broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
 
-        schedule(5, () -> broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
+        server.schedule(5, () -> server.broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
 
-        preFilterRequests(req -> !req.header("deny")
+        server.preFilterRequests(req -> !req.header("deny")
                 .isPresent(), res -> res.status(StatusCodes.FORBIDDEN)
                 .send());
-        preFilterRequests(req -> !req.header("block")
+        server.preFilterRequests(req -> !req.header("block")
                 .isPresent(), res -> res.status(StatusCodes.FORBIDDEN)
                 .send());
 
-        start(spurOptions.enableGzip(true)
+        server.start(new SpurOptions().enableGzip(true)
                 .enableCorsHeaders("*")
                 .enableBlockableHandlers(false)
                 .enableHttps(true)

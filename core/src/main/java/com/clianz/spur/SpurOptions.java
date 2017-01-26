@@ -18,7 +18,6 @@ import org.jboss.logging.Logger;
 public class SpurOptions {
 
     private static final Logger LOGGER = Logger.getLogger(SpurOptions.class.getName());
-    private static SpurOptions option = new SpurOptions();
 
     protected boolean gzipEnabled = getEnvProperty("ENABLE_GZIP", false);
     protected boolean blockableHandlersEnabled = false;
@@ -38,17 +37,17 @@ public class SpurOptions {
     protected String basicAuthUser = getEnvProperty("BASIC_AUTH_USER", "");
     protected String basicAuthPassword = getEnvProperty("BASIC_AUTH_PASS", "");
 
-    protected SpurOptions() {
+    public SpurOptions() {
     }
 
     public SpurOptions forceHttps(boolean forceHttps) {
-        option.forceHttps = forceHttps;
-        return option;
+        this.forceHttps = forceHttps;
+        return this;
     }
 
     public SpurOptions enableCorsHeaders(String corsHeaders) {
-        option.corsHeaders = parseCorsString(corsHeaders);
-        return option;
+        this.corsHeaders = parseCorsString(corsHeaders);
+        return this;
     }
 
     private static List<String> parseCorsString(String corsString) {
@@ -58,66 +57,66 @@ public class SpurOptions {
     }
 
     public SpurOptions enableBlockableHandlers(boolean blockableEnabled) {
-        option.blockableHandlersEnabled = blockableEnabled;
-        return option;
+        this.blockableHandlersEnabled = blockableEnabled;
+        return this;
     }
 
     public SpurOptions enableGzip(boolean gzipEnabled) {
-        option.gzipEnabled = gzipEnabled;
-        return option;
+        this.gzipEnabled = gzipEnabled;
+        return this;
     }
 
     public SpurOptions enableBasicAuth(String user, String pass) {
-        option.basicAuthUser = user;
-        option.basicAuthPassword = pass;
-        return option;
+        this.basicAuthUser = user;
+        this.basicAuthPassword = pass;
+        return this;
     }
 
     public SpurOptions host(String host) {
-        option.host = host;
-        return option;
+        this.host = host;
+        return this;
     }
 
     public SpurOptions port(Integer port) {
-        option.port = port;
-        return option;
+        this.port = port;
+        return this;
     }
 
     public SpurOptions httpsPort(Integer httpsPort) {
-        option.httpsPort = httpsPort;
-        return option;
+        this.httpsPort = httpsPort;
+        return this;
     }
 
     public SpurOptions enableHttp2(Boolean http2Enabled) {
-        option.http2Enabled = http2Enabled;
-        return option;
+        this.http2Enabled = http2Enabled;
+        return this;
     }
 
     public SpurOptions requestParseTimeOut(int requestParseTimeOut) {
-        option.requestParseTimeOut = requestParseTimeOut;
-        return option;
+        this.requestParseTimeOut = requestParseTimeOut;
+        return this;
     }
 
     public SpurOptions maxEntitySize(long maxEntitySize) {
-        option.maxEntitySize = maxEntitySize;
-        return option;
+        this.maxEntitySize = maxEntitySize;
+        return this;
     }
 
     public SpurOptions gzipMaxSize(long gzipMaxSize) {
-        option.gzipMaxSize = gzipMaxSize;
-        return option;
+        this.gzipMaxSize = gzipMaxSize;
+        return this;
     }
 
     public SpurOptions enableHttps(boolean httpsEnabled) {
-        option.httpsEnabled = httpsEnabled;
-        return option;
+        this.httpsEnabled = httpsEnabled;
+        return this;
     }
 
     public SpurOptions sslContext(String keystorePath, String truststorePath, String password) throws Exception {
-        option.keystorePath = keystorePath;
-        option.keystorePassword = password;
-        option.truststorePath = truststorePath;
-        return option;
+        this.keystorePath = keystorePath;
+        this.keystorePassword = password;
+        this.truststorePath = truststorePath;
+        return this;
     }
 
     protected SSLContext getSslContext() throws Exception {
