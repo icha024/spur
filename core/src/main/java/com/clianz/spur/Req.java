@@ -24,6 +24,7 @@ import io.undertow.util.StatusCodes;
 public class Req<T> {
 
     private static final Logger LOGGER = Logger.getLogger(Req.class.getName());
+    private static final ThreadLocal<ObjectMapper> LOCAL_MAPPER = new ThreadLocal<>();
     private static Validator validator;
 
     static {
@@ -34,7 +35,6 @@ public class Req<T> {
         factory.close();
     }
 
-    private ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
     private HttpServerExchange httpServerExchange;
     private T body;
 
@@ -96,9 +96,15 @@ public class Req<T> {
             return;
         }
 
+        ObjectMapper objectMapper = LOCAL_MAPPER.get();
+        if (objectMapper == null) {
+            objectMapper = JsonFactory.createUseJSONDates();
+            LOCAL_MAPPER.set(objectMapper);
+        }
+
         T parsedType;
         try {
-            parsedType = jsonMapper.readValue(str, bodyClassType);
+            parsedType = objectMapper.readValue(str, bodyClassType);
         } catch (Exception e) {
             exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.endExchange();
@@ -118,7 +124,7 @@ public class Req<T> {
         } else {
             exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             exchange.getResponseSender()
-                    .send(jsonMapper.toJson(new InvalidValues(constraintViolations.stream()
+                    .send(objectMapper.toJson(new InvalidValues(constraintViolations.stream()
                             .map(violation -> violation.getPropertyPath()
                                     .toString())
                             .collect(Collectors.toList()))));

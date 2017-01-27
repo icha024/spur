@@ -20,7 +20,7 @@ public class Res {
 
     private static final Logger LOGGER = Logger.getLogger(Res.class.getName());
     private static final String JSON_CONTENT_TYPE = "application/json";
-    private ObjectMapper jsonMapper = JsonFactory.createUseJSONDates();
+    private static final ThreadLocal<ObjectMapper> LOCAL_MAPPER = new ThreadLocal<>();
     private HttpServerExchange httpServerExchange;
 
     protected Res(HttpServerExchange httpServerExchange) {
@@ -83,7 +83,15 @@ public class Res {
         httpServerExchange.getResponseHeaders()
                 .put(Headers.CONTENT_TYPE, JSON_CONTENT_TYPE);
 
-        String jsonStr = jsonMapper.toJson(obj);
+        ObjectMapper objectMapper = LOCAL_MAPPER.get();
+        if (objectMapper == null) {
+            LOGGER.info("Creating new parser.........");
+            objectMapper = JsonFactory.createUseJSONDates();
+            LOCAL_MAPPER.set(objectMapper);
+        }
+
+        String jsonStr = objectMapper
+                .toJson(obj);
         ByteBuffer byteBuffer = ByteBuffer.wrap(jsonStr.getBytes(StandardCharsets.UTF_8));
         StreamSinkChannel responseChannel = httpServerExchange.getResponseChannel();
         int written;

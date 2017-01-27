@@ -1,4 +1,5 @@
-FROM java:8
+#FROM java:8
+FROM ofayau/openjdk:8-compact2
 ADD demo.jar demo.jar
 EXPOSE 8080
 EXPOSE 8443

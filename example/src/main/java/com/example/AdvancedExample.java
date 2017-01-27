@@ -1,10 +1,9 @@
 package com.example;
 
-import com.clianz.spur.SpurOptions;
-import com.clianz.spur.SpurServer;
-
 import java.util.Date;
 
+import com.clianz.spur.SpurOptions;
+import com.clianz.spur.SpurServer;
 import com.example.models.Pet;
 
 import org.jboss.logging.Logger;
@@ -68,7 +67,8 @@ public class AdvancedExample {
         server.sse("/sse");
         server.broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
 
-        server.schedule(5, () -> server.broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
+        server.schedule(5,
+                () -> server.broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
 
         server.preFilterRequests(req -> !req.header("deny")
                 .isPresent(), res -> res.status(StatusCodes.FORBIDDEN)
@@ -79,11 +79,12 @@ public class AdvancedExample {
 
         server.start(new SpurOptions().enableGzip(true)
                 .enableCorsHeaders("*")
-                .enableBlockableHandlers(false)
-                .enableHttps(true)
-                .sslContext(null, null, "password")
-                .enableBasicAuth("admin", "pass")
-                .forceHttps(true));
+//                .enableBlockableHandlers(false)
+//                .enableHttps(true)
+//                .sslContext(null, null, "password")
+//                .enableBasicAuth("admin", "pass")
+//                .forceHttps(true)
+        );
     }
 }
 
