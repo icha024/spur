@@ -14,8 +14,7 @@ import com.clianz.spur.SpurServer;
 public class BasicExample {
     public static void main(final String[] args) {
         new SpurServer()
-            .get("/",     (req, res) -> res.send("Hello World"))
-            .get("/ping", (req, res) -> res.send("Pong"))
+            .get("/", (req, res) -> res.send("Hello World"))
             .start();
    }
 }
@@ -65,6 +64,15 @@ new SpurServer()
 server.schedule(60, () -> LOGGER.info("This is a runnable task that triggers every 60 seconds"));
 ```
 
+## Server Side Event (SSE) Support
+```java
+server.sse("/sse");
+server.broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
+
+server.schedule(5,
+        () -> server.broadcastSse("/sse", sseConn -> sseConn.send("Constant spam, by SSE")));
+```
+
 ## Web-Socket Support
 ```java
 server.websocket("/myapp", res -> {
@@ -79,15 +87,6 @@ server.broadcastWebsockets("/myapp", "Everyone connected to the websocket path /
 server.broadcastWebsockets("/myapp",
         "This message will broadcast to websocket users on the path /myapp only if the predicate operator on the key's value is true",
         "attrKey", attrVal -> attrVal != null);
-```
-
-## Server Side Event (SSE) Support
-```java
-server.sse("/sse");
-server.broadcastSse("/sse", "A Server-Sent-Event (SSE) to everyone listening for events on the endpoint.");
-
-server.schedule(5,
-        () -> server.broadcastSse("/sse", serverSentEventConnection -> serverSentEventConnection.send("Constant spam, by SSE")));
 ```
 
 ## HTTP Request Filter/Validator
