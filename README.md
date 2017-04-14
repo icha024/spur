@@ -2,7 +2,7 @@
  [![Maven Central](https://img.shields.io/maven-central/v/com.clianz/spur-framework.svg)](http://search.maven.org/#search%7Cga%7C1%7Cspur-framework)
  [![Build Status](https://travis-ci.org/icha024/spur.svg?branch=master)](https://travis-ci.org/icha024/spur)
 
-A Sinatra inspired library for building REST microservices in Java 8.
+A Sinatra inspired library for building REST microservices in Java 8. Spur for the cowboy in us!
 
 Lightweight, at 4.6MB in size. 
 
@@ -102,7 +102,7 @@ server.preFilterRequests(req -> !req.header("deny")
 Note: This is not applicable web-sockets or SSE.
 
 ## Other Server Options
-Some other options that can be configured via `server.start(new SpurOptions()...`
+Some other options that can be configured via `server.start(new SpurOptions()...)`
 - forceHttps
 - enableCorsHeaders
 - enableBlockableHandlers
