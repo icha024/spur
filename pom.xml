@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.clianz</groupId>
 	<artifactId>spur-parent</artifactId>
-	<version>0.0.1</version>
+	<version>0.0.2-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>spur-framework</name>
 	<description>Spur framework</description>
@@ -28,7 +28,7 @@
 		<connection>scm:git:git@github.com:icha024/spur.git</connection>
 		<developerConnection>scm:git:git@github.com:icha024/spur.git</developerConnection>
 		<url>http://github.com/icha024/spur</url>
-		<tag>spur-parent-0.0.1</tag>
+		<tag>HEAD</tag>
 	</scm>
 	<build>
 		<plugins>
