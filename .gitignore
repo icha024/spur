@@ -34,3 +34,4 @@ hs_err_pid*
 pom.xml.*
 release.properties
 
+.DS_Store
