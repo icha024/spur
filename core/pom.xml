@@ -4,18 +4,48 @@
 	<parent>
 		<groupId>com.clianz</groupId>
 		<artifactId>spur-parent</artifactId>
-		<version>0.1.0-SNAPSHOT</version>
+		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>spur-framework</artifactId>
-	<version>0.1.0-SNAPSHOT</version>
+	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>spur-core</name>
 	<description>Spur server core library</description>
+	<url>http://github.com/icha024/spur</url>
+	<properties>
+		<java.version>1.8</java.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<undertow.version>1.4.7.Final</undertow.version>
+		<boon.version>0.34</boon.version>
+		<hibernate-validator.version>5.2.4.Final</hibernate-validator.version>
+		<javax.el.version>2.2</javax.el.version>
+	</properties>
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+	<developers>
+		<developer>
+			<id>geeks</id>
+			<name>Development Team</name>
+			<organization>clianz</organization>
+			<organizationUrl>http://clianz.com/</organizationUrl>
+		</developer>
+	</developers>
+	<scm>
+		<connection>scm:git:git@github.com:icha024/spur.git</connection>
+		<developerConnection>scm:git:git@github.com:icha024/spur.git</developerConnection>
+		<url>http://github.com/icha024/spur</url>
+		<tag>HEAD</tag>
+	</scm>
 	<dependencies>
 		<dependency>
 			<groupId>io.undertow</groupId>
 			<artifactId>undertow-core</artifactId>
-			<version>1.4.7.Final</version>
+			<version>${undertow.version}</version>
 		</dependency>
 		<!--<dependency>-->
 			<!--<groupId>com.google.code.gson</groupId>-->
@@ -25,46 +55,101 @@
 		<dependency>
 			<groupId>io.fastjson</groupId>
 			<artifactId>boon</artifactId>
-			<version>0.34</version>
+			<version>${boon.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-validator</artifactId>
-			<version>5.2.4.Final</version>
+			<version>${hibernate-validator.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>javax.el</groupId>
 			<artifactId>el-api</artifactId>
-			<version>2.2</version>
+			<version>${javax.el.version}</version>
 		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.4.2</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<phase>package</phase>
-						<configuration>
-							<outputFile>demo.jar</outputFile>
-							<transformers>
-								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>com.clianz.spur.SpurServer</mainClass>
-								</transformer>
-								<!--<transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">-->
-									<!--<resource>resources</resource>-->
-									<!--<file>server.keystore</file>-->
-								<!--</transformer>-->
-							</transformers>
-						</configuration>
-					</execution>
-				</executions>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.3</version>
+				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
+					<encoding>${project.build.sourceEncoding}</encoding>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-release-plugin</artifactId>
+				<version>2.5</version>
+				<configuration>
+					<autoVersionSubmodules>true</autoVersionSubmodules>
+					<useReleaseProfile>false</useReleaseProfile>
+					<releaseProfiles>release</releaseProfiles>
+					<goals>deploy</goals>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
+	<profiles>
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.5</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<version>2.2.1</version>
+						<executions>
+							<execution>
+								<id>attach-sources</id>
+								<goals>
+									<goal>jar-no-fork</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-javadoc-plugin</artifactId>
+						<version>2.9.1</version>
+						<executions>
+							<execution>
+								<id>attach-javadocs</id>
+								<goals>
+									<goal>jar</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+	<distributionManagement>
+		<snapshotRepository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+		<repository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+		</repository>
+	</distributionManagement>
 </project>
