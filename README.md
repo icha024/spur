@@ -1,4 +1,6 @@
 # Spur Framework
+ [![Maven Central](https://img.shields.io/maven-central/v/com.clianz/spur-framework.svg)](http://search.maven.org/#search%7Cga%7C1%7Cspur-framework)
+ [![Build Status](https://travis-ci.org/icha024/spur-framework.svg?branch=master)](https://travis-ci.org/icha024/spur-framework)
 
 A Sinatra inspired library for building REST microservices in Java 8.
 
