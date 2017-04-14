@@ -4,10 +4,10 @@
 	<parent>
 		<groupId>com.clianz</groupId>
 		<artifactId>spur-parent</artifactId>
-		<version>0.0.2-SNAPSHOT</version>
+		<version>0.0.2</version>
 	</parent>
 	<artifactId>spur-framework</artifactId>
-	<version>0.0.2-SNAPSHOT</version>
+	<version>0.0.2</version>
 	<packaging>jar</packaging>
 	<name>spur-core</name>
 	<description>Spur server core library</description>
