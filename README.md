@@ -116,3 +116,6 @@ Some other options that can be configured via `server.start(new SpurOptions()...
 - enableHttp2 (only with https)
 - requestParseTimeOut
 - maxEntitySize
+
+## Examples
+See: [Examples code](/example/src/main/java/com/example)
