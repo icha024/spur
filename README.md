@@ -119,4 +119,5 @@ Some other options that can be configured via `server.start(new SpurOptions()...
 
 ## Examples
 See: [Examples code](/example/src/main/java/com/example)
+
 Complete sample project: https://github.com/icha024/spur-example
